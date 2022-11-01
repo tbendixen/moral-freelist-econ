@@ -205,7 +205,6 @@ m_binom_int_prep <- map2stan(
 # in generated quantities (top):
 # vector[N] yrep;
 # vector[N] log_lik;
-# vector[N] prop;
 # in generated quantities (pi needs to be defined/computed before it can be used here)
 # for ( i in 1:N ) yrep[i] = binomial_rng(30, inv_logit(p[i]));
 # for ( i in 1:N ) log_lik[i] = binomial_logit_lpmf( y[i] | 30 , p[i] );
@@ -223,12 +222,6 @@ m_binom_int_stan <- gsub("check_impute[i] = check[i];\n        }\n    }//i",
                      "check_impute[i] = check[i];\n        }\n    }//i
                       for ( i in 1:N ) yrep[i] = binomial_rng(30, inv_logit(p[i]));
                       for ( i in 1:N ) log_lik[i] = binomial_logit_lpmf( y[i] | 30 , p[i] );", m_binom_int_code_gq, fixed=TRUE)
-
-m_cat_int_stan <- gsub("check_impute[i] = check[i];\n        }\n    }//i", 
-                       "check_impute[i] = check[i];\n        }\n    }//i 
-                      for (i in 1:N) yrep[i] = ordered_logistic_rng(eta[i], cutpoints);
-                      for (i in 1:N) log_lik[i] = ordered_logistic_lpmf( y[i] | eta[i] , cutpoints );", 
-                       m_cat_int_code_gq, fixed=TRUE)
 
 ### fit model in CmdStan
 # library(cmdstanr) # fitting Stan model # load cmdstanr
@@ -379,7 +372,6 @@ m_binom_noint_prep <- map2stan(
 # in generated quantities (top):
 # vector[N] yrep;
 # vector[N] log_lik;
-# vector[N] prop;
 # in generated quantities (pi needs to be defined/computed before it can be used here)
 # for ( i in 1:N ) yrep[i] = binomial_rng(30, inv_logit(p[i]));
 # for ( i in 1:N ) log_lik[i] = binomial_logit_lpmf( y[i] | 30 , p[i] );
