@@ -6,4 +6,4 @@
 
 `pre-reg_ppc.R`: Compute and plot prior and posterior predictive checks and coefficient plots for focal parameters.
 
-`pre-reg_dg-prob.R` and `pre-reg_rag-prob.R`: Compute and plot posterior predicted probabilities from the fitted for the Dictator Game and Random Allocation Game models, respectively.
+`pre-reg_dg-prob.R` and `pre-reg_rag-prob.R`: Compute and plot posterior predicted probabilities from the fitted Dictator Game and Random Allocation Game models, respectively.
