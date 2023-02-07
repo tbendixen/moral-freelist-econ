@@ -18,9 +18,9 @@
 
 `dg_result_plots.Rmd`: Reports plots for all supplementary models of the Dictator Game. Outputs `dg_result_plots.pdf`.
 
-`imp_plots.Rmd` reports plots from missing data imputations of all variables and across all main models. Outputs `imp_plots.pdf`.
+`imp_plots.Rmd`: Reports plots from missing data imputations of all variables and across all main models. Outputs `imp_plots.pdf`.
 
-`pre-registration.pdf`: the pre-registration document.
+`pre-registration.pdf`: Pre-registration document.
 
 The **pre-registration** folder contains the following files:
 
