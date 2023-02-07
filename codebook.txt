@@ -1,0 +1,27 @@
+CODEBOOK
+
+See Supplementary Materials for further details
+
+"data_prepped.csv":
+
+NEW.ID = participant id
+GROUP = field site
+BGD.MORALITY = number of Moral free-list responses
+BGD.TOTAL = total number of free-list responses
+BGD.SPECCODE = number of game-relevant free-list responses
+BGD.MORPROP = proportion of Moral free-list responses
+BGD.MORVIRTPROP = proportion of Moral+Virtue free-list responses
+BGD.SPECPROP = proportion of game-relevant free-list responses
+RAG.ORDER = order of RAGs; LOCAL game first = 1
+RAG.CHECK = RAG game check
+DG.ORDER = order of DGs; LOCAL game first = 1
+DG.CHECK = DG game check
+CHILDREN = number of children
+MAT = material security
+DIEPUN = punitiveness score
+OMNI.BG = knowledge breadth/omniscience score
+MORINDEX = moral interest scale
+TYPE = game type; SELF game = 1
+SELF = SELF or LOCAL; SELF game = 1
+RAG = RAG or DG; RAG = 1
+Y = coin allocations to DISTANT cup
