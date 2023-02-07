@@ -1,6 +1,6 @@
 # **Moral and cultural beliefs in behavioral economics**
 
-`MoralizingGods_data set_V1.0_wIDs.csv`: Wave 1 and 2 game and demographic, incl. original IDs for merging across waves (see: https://osf.io/epkbw/).
+`MoralizingGods_data set_V1.0_wIDs.csv`: Wave 1 and 2 game and demographic data, incl. original IDs for merging across waves (see: https://osf.io/epkbw/).
 
 `FreeList_CERC_V0.1_FIN.csv`: Wave 1 free-list data (see: https://github.com/bgpurzycki/Evolution-of-Religion-and-Morality/tree/master/Wave%20I and https://github.com/tbendixen/Cross-cultural-Free-list-Project).
 
