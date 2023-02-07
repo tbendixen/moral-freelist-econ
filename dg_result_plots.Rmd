@@ -1,0 +1,499 @@
+---
+title: "**Dictator Game Result Plots**"
+author: "Theiss Bendixen"
+date: "`r Sys.Date()`"
+output: pdf_document
+bibliography: grateful-refs.bib
+---
+
+```{r lockfile, include=FALSE}
+# to initialize and embed the package environment generates the call renv::use(...) below, run:
+# renv::embed()
+
+renv::use(
+  "HDInterval@0.2.2",
+  "MASS@7.3-54",
+  "Matrix@1.5-3",
+  "Pakillo/grateful@HEAD",
+  "R6@2.5.1",
+  "RColorBrewer@1.1-2",
+  "RCurl@1.98-1.6",
+  "Rcpp@1.0.8",
+  "abind@1.4-5",
+  "arrayhelpers@1.1-0",
+  "backports@1.4.1",
+  "base64enc@0.1-3",
+  "bitops@1.0-7",
+  "bslib@0.3.1",
+  "checkmate@2.0.0",
+  "cli@3.2.0",
+  "coda@0.19-4",
+  "colorspace@2.0-3",
+  "cpp11@0.4.2",
+  "crayon@1.5.0",
+  "data.table@1.14.2",
+  "digest@0.6.29",
+  "distributional@0.3.0",
+  "dplyr@1.0.8",
+  "ellipsis@0.3.2",
+  "evaluate@0.15",
+  "fansi@1.0.2",
+  "farver@2.1.0",
+  "fastmap@1.1.0",
+  "fs@1.5.2",
+  "generics@0.1.2",
+  "ggdist@3.1.1",
+  "ggplot2@3.3.5",
+  "ggtext@0.1.1",
+  "glue@1.6.1",
+  "gridtext@0.1.4",
+  "gtable@0.3.0",
+  "highr@0.9",
+  "htmltools@0.5.2",
+  "isoband@0.2.5",
+  "jpeg@0.1-9",
+  "jquerylib@0.1.4",
+  "jsonlite@1.8.0",
+  "knitr@1.39",
+  "labeling@0.4.2",
+  "lattice@0.20-45",
+  "lifecycle@1.0.1",
+  "magrittr@2.0.2",
+  "markdown@1.1",
+  "matrixStats@0.61.0",
+  "mgcv@1.8-38",
+  "mime@0.12",
+  "munsell@0.5.0",
+  "nlme@3.1-153",
+  "numDeriv@2016.8-1.1",
+  "patchwork@1.1.1",
+  "pillar@1.7.0",
+  "pkgconfig@2.0.3",
+  "png@0.1-7",
+  "posterior@1.2.0",
+  "purrr@0.3.4",
+  "rappdirs@0.3.3",
+  "remotes@2.4.2",
+  "renv@0.16.0",
+  "rlang@1.0.6",
+  "rmarkdown@2.14",
+  "sass@0.4.1",
+  "scales@1.1.1",
+  "stringi@1.7.6",
+  "stringr@1.4.0",
+  "svUnit@1.0.6",
+  "tensorA@0.36.2",
+  "tibble@3.1.6",
+  "tidybayes@3.0.2",
+  "tidyr@1.2.1",
+  "tidyselect@1.1.2",
+  "tinytex@0.38",
+  "utf8@1.2.2",
+  "vctrs@0.3.8",
+  "viridisLite@0.4.0",
+  "withr@2.5.0",
+  "xfun@0.29",
+  "xml2@1.3.3",
+  "yaml@2.3.5"
+)
+```
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache = TRUE, include = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r load, cache = FALSE}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(tidybayes)
+library(data.table)
+library(ggtext)
+library(patchwork)
+library(grateful)
+
+load("model_fits.Rdata")
+
+memory.limit(size=56000)
+
+```
+
+## Introduction
+
+This notebook reports plots for all supplementary models of the Dictator Game. 
+
+The title denotes the game type (i.e., SELF or LOCAL), the subtitle of the plots gives the contrast (i.e., our measure of "morality"), and the caption gives the model type (i.e., additive or interaction).
+
+```{r dg_plot_fun}
+dg_plot_fun <- function(fit, dat_list, interaction = c(TRUE, FALSE)) {
+  
+  fit <- fit
+  dat_list <- dat_list
+  
+  if(interaction == TRUE) {
+    ### Extract interaction coefficients from fitted model
+    bM <- fit$draws("bM") |> posterior::as_draws_df()
+    bMj <- fit$draws("bMj") |> posterior::as_draws_matrix()
+    bO <- fit$draws("bO") |> posterior::as_draws_df()
+    bOj <- fit$draws("bOj") |> posterior::as_draws_matrix()
+    bP <- fit$draws("bP") |> posterior::as_draws_df()
+    bPj <- fit$draws("bPj") |> posterior::as_draws_matrix()
+    bMO <- fit$draws("bMO") |> posterior::as_draws_df()
+    bMOj <- fit$draws("bMOj") |> posterior::as_draws_matrix()
+    bMP <- fit$draws("bMP") |> posterior::as_draws_df()
+    bMPj <- fit$draws("bMPj") |> posterior::as_draws_matrix()
+    bPO <- fit$draws("bPO") |> posterior::as_draws_df()
+    bPOj <- fit$draws("bPOj") |> posterior::as_draws_matrix()
+    bMPO <- fit$draws("bMPO") |> posterior::as_draws_df()
+    bMPOj <- fit$draws("bMPOj") |> posterior::as_draws_matrix()
+    border <- fit$draws("border") |> posterior::as_draws_df()
+    bcheck <- fit$draws("bcheck") |> posterior::as_draws_df()
+    bC <- fit$draws("bC") |> posterior::as_draws_df()
+    bS <- fit$draws("bS") |> posterior::as_draws_df()
+    cutpoints <- fit$draws("cutpoints") |> posterior::as_draws_df()
+  }
+  
+  if(interaction == FALSE) {
+    ### Extract additive coefficients from fitted model
+    bM <- fit$draws("bM") |> posterior::as_draws_df()
+    bMj <- fit$draws("bMj") |> posterior::as_draws_matrix()
+    bO <- fit$draws("bO") |> posterior::as_draws_df()
+    bOj <- fit$draws("bOj") |> posterior::as_draws_matrix()
+    bP <- fit$draws("bP") |> posterior::as_draws_df()
+    bPj <- fit$draws("bPj") |> posterior::as_draws_matrix()
+    border <- fit$draws("border") |> posterior::as_draws_df()
+    bcheck <- fit$draws("bcheck") |> posterior::as_draws_df()
+    bC <- fit$draws("bC") |> posterior::as_draws_df()
+    bS <- fit$draws("bS") |> posterior::as_draws_df()
+    cutpoints <- fit$draws("cutpoints") |> posterior::as_draws_df()
+  }
+   
+  ### Get size of posterior
+  ndraws <- 1:nrow(bM)
+  
+  ### Marginalizing over predictors
+  # 1) (marginal) prediction matrix (for "average treatment effect"/g-computation-ish calculation)
+  
+  M_pred <- with(as.data.frame(dat_list),
+                 c(rep(0, length(id)), 
+                   rep(max(dat_list$M, na.rm=T), length(id))))
+  
+  levels <- length(unique(M_pred)) # how many levels of the focal predictor?
+  
+  pred_ate_group <-  with(as.data.frame(dat_list),
+                          data.frame(
+                            id = rep(id, levels),
+                            M = M_pred,
+                            group = rep(group, levels),
+                            O = rep(O, levels),
+                            P = rep(P, levels),
+                            C = rep(C, levels),
+                            S = rep(S, levels),
+                            check = rep(check, levels),
+                            order = rep(order, levels),
+                            type = rep(type, levels))
+  )
+  
+  # 2) plug posterior mean of imputations for variables with missingness into prediction grid,
+  # so that we get predictions for these individuals even if they had missing values
+  
+  O_impute <- fit$draws("O_impute") |> posterior::as_draws_matrix()
+  O_impute_mean <- apply(O_impute, 2, mean)
+  O_impute_idx <- which(is.na(pred_ate_group$O))
+  pred_ate_group[O_impute_idx,]$O <- O_impute_mean
+  
+  P_impute <- fit$draws("P_impute") |> posterior::as_draws_matrix()
+  P_impute_mean <- apply(P_impute, 2, mean)
+  P_impute_idx <- which(is.na(pred_ate_group$P))
+  pred_ate_group[P_impute_idx,]$P <- P_impute_mean
+  
+  C_impute <- fit$draws("C_impute") |> posterior::as_draws_matrix()
+  C_impute_mean <- apply(C_impute, 2, mean)
+  C_impute_idx <- which(is.na(pred_ate_group$C))
+  pred_ate_group[C_impute_idx,]$C <- C_impute_mean
+  
+  S_impute <- fit$draws("S_impute") |> posterior::as_draws_matrix()
+  S_miss_idx <- which(is.na(dat_list$S))
+  S_impute_mean <- apply(S_impute[,S_miss_idx], 2, mean)
+  S_impute_idx <- which(is.na(pred_ate_group$S))
+  pred_ate_group[S_impute_idx,]$S <- S_impute_mean
+  
+  check_impute <- fit$draws("check_impute") |> posterior::as_draws_matrix()
+  check_miss_idx <- which(is.na(dat_list$check))
+  check_impute_mean <- apply(check_impute[,check_miss_idx], 2, mean)
+  check_impute_idx <- which(is.na(pred_ate_group$check))
+  pred_ate_group[check_impute_idx,]$check <- check_impute_mean
+  
+  pred_ate_group <- as.data.table(pred_ate_group) # convert to data.table for faster processing
+  
+  # 2) (marginal) prediction matrix
+  
+  # the multilevel linear model, group-level, ignoring id random effect
+  group_levels <- length(unique(dat_list$group))
+  
+  if(interaction == TRUE){
+    # interaction model
+    pred_coef_group <- data.table(bM=rep(bM$bM, group_levels), bO=rep(bO$bO, group_levels), bP=rep(bP$bP, group_levels),
+                                  bMO=rep(bMO$bMO, group_levels), bMP=rep(bMP$bMP, group_levels), bPO=rep(bPO$bPO, group_levels), 
+                                  bMPO=rep(bMPO$bMPO, group_levels),
+                                  bC=rep(bC$bC, group_levels), bS=rep(bS$bS, group_levels),
+                                  border=rep(border$border, group_levels), bcheck=rep(bcheck$bcheck,group_levels),
+                                  bMj=as.vector(bMj), bOj=as.vector(bOj), bPj=as.vector(bPj),
+                                  bMOj=as.vector(bMOj),bMPj=as.vector(bMPj), bPOj=as.vector(bPOj), bMPOj=as.vector(bMPOj),
+                                  group=rep(unique(sort(dat_list$group)), each=length(ndraws)),
+                                  .draw=rep(1:length(ndraws), group_levels))
+    
+    
+    predeta_fun <- function(x) {
+      eta <- with(x, (bM+bMj)*M + 
+                    (bO+bOj)*O + (bP + bPj)*P +
+                    (bMP+bMPj)*M*P + (bMO+bMOj)*M*O + (bPO+bPOj)*P*O +
+                    (bMPO+bMPOj)*M*P*O +
+                    bC*C + bS*S +
+                    border*order + bcheck*check)
+      }
+    }
+    
+    if(interaction == FALSE){
+      
+      # additive model
+      pred_coef_group <- data.table(bM=rep(bM$bM, group_levels), bO=rep(bO$bO, group_levels), bP=rep(bP$bP, group_levels),
+                                    bC=rep(bC$bC, group_levels), bS=rep(bS$bS, group_levels),
+                                    border=rep(border$border, group_levels), bcheck=rep(bcheck$bcheck,group_levels),
+                                    bMj=as.vector(bMj), bOj=as.vector(bOj), bPj=as.vector(bPj),
+                                    group=rep(unique(sort(dat_list$group)), each=length(ndraws)),
+                                    .draw=rep(1:length(ndraws), group_levels))
+      
+      predeta_fun <- function(x) {
+        eta <- with(x, (bM+bMj)*M + 
+                      (bO+bOj)*O + (bP + bPj)*P +
+                      bC*C + bS*S +
+                      border*order + bcheck*check)
+        }
+      }
+    
+  pred_mat_group <- merge(pred_ate_group, pred_coef_group, by = "group", allow.cartesian=TRUE)
+  
+  predcoin_fun <- function(eta, cutpoints){
+    coin0 <- 1 - plogis((eta)-cutpoints$`cutpoints[1]`)
+    coin1 <- plogis((eta)-cutpoints$`cutpoints[1]`) - plogis((eta)-cutpoints$`cutpoints[2]`)
+    coin2 <- plogis((eta)-cutpoints$`cutpoints[2]`) - plogis((eta)-cutpoints$`cutpoints[3]`)
+    coin3 <- plogis((eta)-cutpoints$`cutpoints[3]`) - plogis((eta)-cutpoints$`cutpoints[4]`)
+    coin4 <- plogis((eta)-cutpoints$`cutpoints[4]`) - plogis((eta)-cutpoints$`cutpoints[5]`)
+    coin5 <- plogis((eta)-cutpoints$`cutpoints[5]`) - plogis((eta)-cutpoints$`cutpoints[6]`)
+    coin6 <- plogis((eta)-cutpoints$`cutpoints[6]`) - plogis((eta)-cutpoints$`cutpoints[7]`)
+    coin7 <- plogis((eta)-cutpoints$`cutpoints[7]`) - plogis((eta)-cutpoints$`cutpoints[8]`)
+    coin8 <- plogis((eta)-cutpoints$`cutpoints[8]`) - plogis((eta)-cutpoints$`cutpoints[9]`)
+    coin9 <- plogis((eta)-cutpoints$`cutpoints[9]`) - plogis((eta)-cutpoints$`cutpoints[10]`)
+    coin10 <- plogis((eta)-cutpoints$`cutpoints[10]`)
+    return(as.data.table(cbind(coin0,coin1,coin2,coin3,coin4,coin5,coin6,coin7,coin8,coin9,coin10)))
+  }
+  
+  # calculate eta
+  for (group in unique(pred_mat_group$group)){  # for each category that is unique in the culture variable
+    sub <- subset(pred_mat_group, group == group)
+    sub$eta <- predeta_fun(sub) # compute eta
+    subeta <- sub
+  }
+
+  # calculate probability of each coin allocation
+  for (group in unique(subeta$group)){  # for each category that is unique in the culture variable
+    prepcoin <- subset(subeta, group == group)
+    subcoin <- predcoin_fun(eta=prepcoin$eta, cutpoints=cutpoints) # compute probability of coin allocations
+    postpredcoin <- cbind(prepcoin, subcoin)
+  }
+  
+  # get predictions in format for plotting
+  postpredcoin_select <- postpredcoin |> select(c(M, id, group, .draw, starts_with("coin")))
+  
+  postpredcoin_select_summary_l <- postpredcoin_select |> pivot_longer(5:15, names_to = "coins")
+  
+  M0coins <- postpredcoin_select_summary_l[postpredcoin_select_summary_l$M==0,] |> as.data.table()
+  M0coins$coins <- sub("^coin", "", M0coins$coins) |> as.numeric()
+  colnames(M0coins) <- paste0("M0", colnames(M0coins))
+  M1coins <- postpredcoin_select_summary_l[postpredcoin_select_summary_l$M==max(dat_list$M, na.rm=T),] |> as.data.table()
+  M1coins$coins <- sub("^coin", "", M1coins$coins) |> as.numeric()
+  colnames(M1coins) <- paste0("M1", colnames(M1coins))
+  
+  ridgeplotcoin <- merge(M0coins, M1coins, 
+                         by.x = c("M0id", "M0group", "M0.draw", "M0coins"), 
+                         by.y = c("M1id", "M1group", "M1.draw", "M1coins"))
+  
+  ridgeplotcoin$diff <- with(ridgeplotcoin, M1value-M0value)
+    
+  # plot
+  plot <- ridgeplotcoin |> 
+    group_by(M0group, M0coins) |> 
+    tidybayes::mean_hdci(diff) |>
+    ggplot(aes(x = M0coins, y = diff, ymin = .lower, ymax = .upper)) + 
+    geom_pointrange(size = .5,
+                    aes(color = stat(y > 0))) +
+    scale_color_manual(values = c("gray30", "#3182BD")) +
+    geom_hline(yintercept = 0, linetype = "dashed", alpha = 0.5) +
+    theme(panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = "white"),
+          panel.grid.major.y = element_blank(),
+          legend.position = "none") +
+    scale_x_continuous(breaks = seq(0, 10, by = 1)) + 
+    scale_y_continuous(breaks = seq(-0.15,0.15, by=0.05), labels = c("-15%","-10%","-5%","0%","5%","10%","15%")) +
+    ylab(NULL) +
+    xlab(NULL) +
+    facet_wrap("M0group", ncol = 3) +
+    coord_cartesian(xlim=c(0,10), ylim=c(-0.15, 0.15)) # reduced margin at top (ylim) and center (xlim)
+}
+```
+
+```{r dgmainplots}
+### Plots reported in main manuscript (interaction models)
+cairo_pdf("dg_fig.pdf",
+          width = 8, height = 9) # start print to pdf
+
+(dg_plot_fun(m_dg_self_int_cmdstan_fit, dg_self_dat_list, interaction = TRUE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>SELF</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between <b style='color:#666666;'>not free-listing Morality</b> vs. <b style='color:#0072B2;'>free-listing only Morality</b> among god's concerns",)) +
+(dg_plot_fun(m_dg_local_int_cmdstan_fit, dg_local_dat_list, interaction = TRUE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>LOCAL</b> Game",
+       subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between <b style='color:#666666;'>not free-listing Morality</b> vs. <b style='color:#0072B2;'>free-listing only Morality</b> among god's concerns",)) +
+  patchwork ::plot_layout(ncol = 1, nrow = 2)
+
+dev.off() # end print to pdf
+```
+
+```{r dgmainadd, echo = FALSE, include = TRUE, fig.height = 9, fig.width = 8}
+### Additive versions of models from main manuscript
+(dg_plot_fun(m_dg_self_add_cmdstan_fit, dg_self_dat_list, interaction = FALSE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>SELF</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between <b style='color:#666666;'>not free-listing Morality</b> vs. <b style='color:#0072B2;'>free-listing only Morality</b> among god's concerns",
+         caption = "Additive model.")) +
+(dg_plot_fun(m_dg_local_add_cmdstan_fit, dg_local_dat_list, interaction = FALSE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>LOCAL</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between <b style='color:#666666;'>not free-listing Morality</b> vs. <b style='color:#0072B2;'>free-listing only Morality</b> among god's concerns",
+       caption = "Additive model.")) +
+  patchwork ::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r dgindexint, echo = FALSE, include = TRUE, fig.height = 9, fig.width = 8}
+(dg_plot_fun(m_dg_index_self_int_cmdstan_fit, dg_index_self_dat_list, interaction = TRUE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>SELF</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between rating god as <b style='color:#666666;'>not moralistic</b> vs. <b style='color:#0072B2;'>maximally moralistic</b> on the moral interest scale",
+         caption = "Interaction model.")) +
+(dg_plot_fun(m_dg_index_local_int_cmdstan_fit, dg_index_local_dat_list, interaction = TRUE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>LOCAL</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between rating god as <b style='color:#666666;'>not moralistic</b> vs. <b style='color:#0072B2;'>maximally moralistic</b> on the moral interest scale",
+         caption = "Interaction model.")) +
+  patchwork ::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r dgindexadd, echo = FALSE, include = TRUE, fig.height = 9, fig.width = 8}
+(dg_plot_fun(m_dg_index_self_add_cmdstan_fit, dg_index_self_dat_list, interaction = FALSE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>SELF</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between rating god as <b style='color:#666666;'>not moralistic</b> vs. <b style='color:#0072B2;'>maximally moralistic</b> on the moral interest scale",
+         caption = "Additive model.")) +
+(dg_plot_fun(m_dg_index_local_add_cmdstan_fit, dg_index_local_dat_list, interaction = FALSE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>LOCAL</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between rating god as <b style='color:#666666;'>not moralistic</b> vs. <b style='color:#0072B2;'>maximally moralistic</b> on the moral interest scale",
+         caption = "Additive model.")) +
+  patchwork ::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r dgspecint, echo = FALSE, include = TRUE, fig.height = 9, fig.width = 8}
+(dg_plot_fun(m_dg_spec_self_int_cmdstan_fit, dg_spec_self_dat_list, interaction = TRUE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>SELF</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between <b style='color:#666666;'>not free-listing game code</b> vs. <b style='color:#0072B2;'>free-listing only game code</b> among god's concerns",
+         caption = "Interaction model.")) +
+(dg_plot_fun(m_dg_spec_local_int_cmdstan_fit, dg_spec_local_dat_list, interaction = TRUE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>LOCAL</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between <b style='color:#666666;'>not free-listing game code</b> vs. <b style='color:#0072B2;'>free-listing only game code</b> among god's concerns",
+         caption = "Interaction model.")) +
+  patchwork ::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r dgspecadd, echo = FALSE, include = TRUE, fig.height = 9, fig.width = 8}
+(dg_plot_fun(m_dg_spec_self_add_cmdstan_fit, dg_spec_self_dat_list, interaction = FALSE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>SELF</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between <b style='color:#666666;'>not free-listing game code</b> vs. <b style='color:#0072B2;'>free-listing only game code</b> among god's concerns",
+         caption = "Additive model.")) +
+(dg_plot_fun(m_dg_spec_local_add_cmdstan_fit, dg_spec_local_dat_list, interaction = FALSE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>LOCAL</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between <b style='color:#666666;'>not free-listing game code</b> vs. <b style='color:#0072B2;'>free-listing only game code</b> among god's concerns",
+         caption = "Additive model.")) +
+  patchwork ::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r dgmvint, echo = FALSE, include = TRUE, fig.height = 9, fig.width = 8}
+(dg_plot_fun(m_dg_mv_self_int_cmdstan_fit, dg_mv_self_dat_list, interaction = TRUE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>SELF</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between <b style='color:#666666;'>not free-listing Morality + Virtue</b> vs. <b style='color:#0072B2;'>free-listing only Morality + Virtue</b> among god's concerns",
+         caption = "Interaction model.")) +
+(dg_plot_fun(m_dg_mv_local_int_cmdstan_fit, dg_mv_local_dat_list, interaction = TRUE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>LOCAL</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between <b style='color:#666666;'>not free-listing Morality + Virtue</b> vs. <b style='color:#0072B2;'>free-listing only Morality + Virtue</b> among god's concerns",
+         caption = "Interaction model.")) +
+  patchwork ::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r dgmvadd, echo = FALSE, include = TRUE, fig.height = 9, fig.width = 8}
+(dg_plot_fun(m_dg_mv_self_add_cmdstan_fit, dg_mv_self_dat_list, interaction = FALSE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>SELF</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between <b style='color:#666666;'>not free-listing Morality + Virtue</b> vs. <b style='color:#0072B2;'>free-listing only Morality + Virtue</b> among god's concerns",
+         caption = "Additive model.")) +
+(dg_plot_fun(m_dg_mv_local_add_cmdstan_fit, dg_mv_local_dat_list, interaction = FALSE) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Dictator <b style='color:#000000;'>LOCAL</b> Game",
+         subtitle = "Contrasts in predicted probabilities of coin allocations to the DISTANT cup<br>
+         between <b style='color:#666666;'>not free-listing Morality + Virtue</b> vs. <b style='color:#0072B2;'>free-listing only Morality + Virtue</b> among god's concerns",
+         caption = "Additive model.")) +
+  patchwork ::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+\newpage
+
+# `R` packages
+
+```{r cite-package, results = 'asis', cache = FALSE, include = TRUE}
+cite_packages(dependencies = TRUE, cite.tidyverse = TRUE, output = "paragraph")
+```
+
+\newpage
+
+# References
+
+<div id="refs"></div>

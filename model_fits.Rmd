@@ -1,0 +1,2751 @@
+---
+title: "**All Model Fits**"
+author: "Theiss Bendixen"
+date: "`r Sys.Date()`"
+output: pdf_document
+bibliography: grateful-refs.bib
+---
+
+```{r lockfile, include=FALSE}
+renv::use(
+  "BH@1.78.0-0",
+  "MASS@7.3-54",
+  "Matrix@1.5-3",
+  "Pakillo/grateful@HEAD",
+  "R6@2.5.1",
+  "RColorBrewer@1.1-2",
+  "Rcpp@1.0.8",
+  "RcppEigen@0.3.3.9.1",
+  "RcppParallel@5.1.5",
+  "StanHeaders@2.21.0-7",
+  "abind@1.4-5",
+  "backports@1.4.1",
+  "base64enc@0.1-3",
+  "bayesplot@1.8.1",
+  "bslib@0.3.1",
+  "callr@3.7.0",
+  "checkmate@2.0.0",
+  "cli@3.2.0",
+  "stan-dev/cmdstanr@HEAD",
+  "coda@0.19-4",
+  "colorspace@2.0-3",
+  "crayon@1.5.0",
+  "data.table@1.14.2",
+  "desc@1.4.0",
+  "digest@0.6.29",
+  "distributional@0.3.0",
+  "dplyr@1.0.8",
+  "ellipsis@0.3.2",
+  "evaluate@0.15",
+  "fansi@1.0.2",
+  "farver@2.1.0",
+  "fastmap@1.1.0",
+  "fs@1.5.2",
+  "generics@0.1.2",
+  "ggplot2@3.3.5",
+  "ggridges@0.5.3",
+  "glue@1.6.1",
+  "gridExtra@2.3",
+  "gtable@0.3.0",
+  "highr@0.9",
+  "htmltools@0.5.2",
+  "inline@0.3.19",
+  "isoband@0.2.5",
+  "jquerylib@0.1.4",
+  "jsonlite@1.8.0",
+  "knitr@1.39",
+  "labeling@0.4.2",
+  "lattice@0.20-45",
+  "lifecycle@1.0.1",
+  "loo@2.4.1",
+  "magrittr@2.0.2",
+  "matrixStats@0.61.0",
+  "mgcv@1.8-38",
+  "munsell@0.5.0",
+  "mvtnorm@1.1-3",
+  "nlme@3.1-153",
+  "numDeriv@2016.8-1.1",
+  "pillar@1.7.0",
+  "pkgbuild@1.3.1",
+  "pkgconfig@2.0.3",
+  "plyr@1.8.6",
+  "posterior@1.2.0",
+  "prettyunits@1.1.1",
+  "processx@3.5.2",
+  "ps@1.6.0",
+  "purrr@0.3.4",
+  "quadprog@1.5-8",
+  "rappdirs@0.3.3",
+  "remotes@2.4.2",
+  "renv@0.16.0",
+  "reshape2@1.4.4",
+  "rlang@1.0.6",
+  "rmarkdown@2.14",
+  "rmcelreath/rethinking@HEAD",
+  "rprojroot@2.0.2",
+  "rstan@2.21.3",
+  "sass@0.4.1",
+  "scales@1.1.1",
+  "shape@1.4.6",
+  "stringi@1.7.6",
+  "stringr@1.4.0",
+  "tensorA@0.36.2",
+  "tibble@3.1.6",
+  "tidyselect@1.1.2",
+  "tinytex@0.38",
+  "utf8@1.2.2",
+  "vctrs@0.3.8",
+  "viridisLite@0.4.0",
+  "withr@2.5.0",
+  "xfun@0.29",
+  "yaml@2.3.5"
+)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache = TRUE, include = FALSE)
+```
+
+```{r load, cache = FALSE}
+library(rethinking) # prepare Stan code and data
+library(grateful) # for citing packages
+library(bayesplot) # for plotting
+library(loo) # for model comparison
+
+set_cmdstan_path("C:\\cmdstan\\cmdstan-2.29.0") # set path to whereever cmdstan in installed
+
+```
+
+## Introduction
+
+This notebook reports coefficient plots, trace rank plots or "trank plots" [@rethinking], and posterior predictive checks for all models as well as some simple diagnostics (e.g., number of divergent transitions, if any).
+
+The headers **give the model name** -- e.g., RAG SELF INT refers to the main RAG SELF interaction model and RAG SELF ADD refers to the main RAG SELF additive model.
+
+The **coefficient plots** report raw log odds for key parameters. 
+
+The **trank plots** display ranked histograms of each chain for key parameters; they are similar to the more conventional trace plots, in that for well-mixing chains we expect that no chain is consistently above or below the others (i.e., they are relatively uniform). The printed `n_eff` reports the effective number of samples from the posterior, where higher numbers indicate efficient chains. For each of four chains, we took 1000 warmup and 1000 post-warmup samples.
+
+**The posterior predictive checks** give a sense of the models fit to the data; we generally expect posterior predictions (in dark blue lines and points) from a well-fitting model to resemble those of the original dataset (in light blue bars).
+ 
+Below all additive models are printed **approximate LOO** model comparison metrics (difference in expected log posterior density (`elpd_diff`) and the standard error (`se_diff`) of the difference) for the interactive model (`model1`) and the additive model (`model2`) in each model pair. Generally speaking, the ELPD differences are small compared to their standard errors, indicating inconclusive evidence for interaction effects overall.
+
+
+```{r fit-fun}
+cmdstanfit_fun <- function(stancode, stanprep) {
+  stan_file <- write_stan_file(stancode)
+  cmdstan_model <- cmdstan_model(stan_file, compile=TRUE)
+  cmdstanfit <- cmdstan_model$sample(
+    data = stanprep$data,
+    iter_warmup = 1000,
+    iter_sampling = 1000,
+    seed = 1992,
+    chains = 4,
+    parallel_chains = 4,
+    output_dir = getwd())
+  return(cmdstanfit)
+}
+
+```
+
+\newpage
+
+## RAG SELF INT
+
+```{r rag-self-int}
+### Load prepped data
+full_df <- read.csv("data_prepped.csv")
+
+### Select RAG SELF variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==1 & full_df$SELF==1 ) # Only RAG SELF and non-missing outcome
+
+rag_self_dat_list <- with(full_df,
+                 list(
+                 id = NEW.ID[y_notmiss],
+                 group = GROUP[y_notmiss],
+                 M = BGD.MORPROP[y_notmiss],
+                 C = CHILDREN[y_notmiss],
+                 S = MAT[y_notmiss],
+                 P = DIEPUN[y_notmiss],
+                 O = OMNI.BG[y_notmiss],
+                 y = Y[y_notmiss],
+                 order = RAG.ORDER[y_notmiss],
+                 check = RAG.CHECK[y_notmiss],
+                 type = SELF[y_notmiss]
+                 )
+               )
+
+rag_self_dat_list$N <- length(rag_self_dat_list$y)
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+rag_int_prep_fun <- function(dat_list) {
+  map2stan(
+  alist(
+    ## coin model
+    y ~ dbinom(30,p),
+    
+    logit(p) <- a + aj[group] +
+      (bM+bMj[group])*M + (bO+bOj[group])*O + (bP+bPj[group])*P +
+      (bMP+bMPj[group])*M*P + (bMO+bMOj[group])*M*O +
+      (bPO+bPOj[group])*P*O + (bMPO+bMPOj[group])*M*P*O +
+      bC*C + bS*S + border*order + bcheck*check,
+    
+    ## morality model
+    M ~ normal(M_mu,M_sd),
+    M_mu <- Mavg[group],
+    M_sd ~ exponential(1),
+    Mavg[group] ~ normal(Mu_Mavg,sigmaMavg),
+    Mu_Mavg ~ normal(0.5, 0.5),
+    sigmaMavg ~ exponential(1),
+    
+    ## pun model
+    P ~ normal(P_mu,P_sd),
+    P_mu <- Pavg[group],
+    P_sd ~ exponential(1),
+    Pavg[group] ~ normal(Mu_Pavg,sigmaPavg),
+    Mu_Pavg ~ normal(0.5, 0.5),
+    sigmaPavg ~ exponential(1),
+    
+    ## omni model
+    O ~ normal(O_mu,O_sd),
+    O_mu <- Oavg[group],
+    O_sd ~ exponential(1),
+    Oavg[group] ~ normal(Mu_Oavg,sigmaOavg),
+    Mu_Oavg ~ normal(0.5, 0.5),
+    sigmaOavg ~ exponential(1),
+    
+    ## children
+    C ~ normal(C_mu,C_sd), # >=0 constraint imposed later
+    C_mu <- Cavg[group],
+    C_sd ~ exponential(10), # prior pred implications: dens(rexp(1000, rate = 10))
+    Cavg[group] ~ normal(Mu_Cavg,sigmaCavg),
+    Mu_Cavg ~ normal(1,2),
+    sigmaCavg ~ exponential(1),
+    
+    ## priors
+    a ~ normal(0,1.5),
+    c(bM, bP, bO, bMP, bMO, bPO, bMPO, bC, bS, border, bcheck) ~ normal(0,1),
+    
+    ## varying intercepts and slopes
+    c(aj, bMj , bPj , bOj, bMPj, bMOj, bPOj, bMPOj)[group] ~ dmvnormNC( Sigmaj , Rhoj ),
+    Sigmaj ~ dexp(1),
+    Rhoj ~ dlkjcorr(4),
+    
+    ## imputation distributions below
+    S ~ bernoulli(phi_S),
+    phi_S ~ beta(1,1),
+    check ~ bernoulli(phi_check),
+    phi_check ~ beta(1,1),
+    order ~ bernoulli(phi_order),
+    phi_order ~ beta(1,1)
+    
+  ),
+  
+  constraints=list(
+    phi_S="lower=0,upper=1",
+    phi_check="lower=0,upper=1",
+    phi_order="lower=0,upper=1",
+    C_impute="lower=0",
+    M_impute="lower=0,upper=1",
+    P_impute="lower=0,upper=1",
+    O_impute="lower=0,upper=1"
+  ),
+  data=dat_list ,
+  sample=FALSE ,
+  do_discrete_imputation = TRUE)
+}
+
+m_rag_self_int_prep <- rag_int_prep_fun(rag_self_dat_list)
+
+rag_stancode_fun <- function(prep) {
+  
+  ### Add to Stan code:
+  # in generated quantities (top):
+  # vector[N] yrep;
+  # vector[N] log_lik;
+  # in generated quantities (pi needs to be defined/computed before it can be used here)
+  # for ( i in 1:N ) yrep[i] = binomial_rng(30, inv_logit(p[i]));
+  # for ( i in 1:N ) log_lik[i] = binomial_logit_lpmf( y[i] | 30 , p[i] );
+
+# extract raw Stan code
+prep_code <- rethinking::stancode(prep)
+
+# amend raw Stan code
+prep_code_gq <- gsub("vector[N] S_impute;", 
+                            "vector[N] S_impute;
+                      vector[N] yrep;
+                      vector[N] log_lik;", prep_code, fixed=TRUE)
+
+prep_code_gq_stan <- gsub("check_impute[i] = check[i];\n        }\n    }//i", 
+                         "check_impute[i] = check[i];\n        }\n    }//i
+                      for ( i in 1:N ) yrep[i] = binomial_rng(30, inv_logit(p[i]));
+                      for ( i in 1:N ) log_lik[i] = binomial_logit_lpmf( y[i] | 30 , p[i] );", prep_code_gq, fixed=TRUE)
+ 
+return(prep_code_gq_stan)
+
+}
+
+# amend Stan code
+m_rag_self_int_stan <- rag_stancode_fun(m_rag_self_int_prep)
+
+## fit model in CmdStan
+m_rag_self_int_cmdstan_fit <- cmdstanfit_fun(m_rag_self_int_stan, m_rag_self_int_prep)
+
+```
+
+```{r rag-self-int-check, include = TRUE}
+### posterior predictive check
+ppc_site_fun <- function(prep, fit) {
+  fit_draws <- fit$draws("yrep") |> posterior::as_draws_matrix()
+
+  fitnrow <- nrow(fit_draws)
+
+  idnrow <- length(unique(prep$data[["id"]]))
+
+  fit_yrep <- fit_draws[1:fitnrow,1:idnrow]
+
+  ppc_bars_grouped(y = prep$data[["y"]],
+                 yrep = fit_yrep,
+                 group = prep$data[["group"]],
+                 size = 0.2,
+                 facet_args = list(ncol=3), # set number of columns
+                 freq = TRUE) + # easier to compare groups with proportions, instead of counts
+  xlab("Number of coins allocated to DISTANT cup") +
+  theme(legend.position = "none") # remove legend
+  
+}
+
+### coefficient plot
+coef_fun <- function(fit, pars){
+  
+  fit_pars <- fit$draws(pars) |> posterior::as_draws_matrix()
+  
+  mcmc_areas(fit_pars, prob = 0.8) + xlab("Raw coefficient (log odds)") + ylab("Focal parameters")
+
+  
+}
+
+int_check_fun <- function(prep, fit) {
+
+### quick MCMC diagnostic check
+fit$diagnostic_summary()
+
+int_pars <- c("bM", "bO", "bP", "bMP", "bMO", "bMPO", "bS", "bC", "border", "bcheck")
+
+coef_fun(fit, int_pars)
+
+}
+
+int_check_fun(m_rag_self_int_prep, m_rag_self_int_cmdstan_fit)
+
+```
+
+```{r rag-self-int-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_self_int_prep, m_rag_self_int_cmdstan_fit)
+
+```
+
+```{r rag-self-int-trank, include = TRUE, warning = FALSE}
+int_trank_fun <- function(fit) {
+  int_pars <- c("bM", "bO", "bP", "bMP", "bMO", "bMPO", "bS", "bC", "border", "bcheck")
+  trankplot(rstan::read_stan_csv(fit$output_files()), pars = int_pars)
+}
+
+int_trank_fun(m_rag_self_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## RAG SELF ADD
+
+```{r rag-self-add}
+### Prepare additive model and model data with rethinking
+rag_add_prep_fun <- function(dat_list) {
+  map2stan(
+  alist(
+    ## coin model
+    y ~ dbinom(30,p),
+    
+    logit(p) <- a + aj[group] +
+      (bM+bMj[group])*M + (bO+bOj[group])*O + (bP+bPj[group])*P +
+      bC*C + bS*S + border*order + bcheck*check,
+    
+    ## morality model
+    M ~ normal(M_mu,M_sd),
+    M_mu <- Mavg[group],
+    M_sd ~ exponential(1),
+    Mavg[group] ~ normal(Mu_Mavg,sigmaMavg),
+    Mu_Mavg ~ normal(0.5, 0.5),
+    sigmaMavg ~ exponential(1),
+    
+    ## pun model
+    P ~ normal(P_mu,P_sd),
+    P_mu <- Pavg[group],
+    P_sd ~ exponential(1),
+    Pavg[group] ~ normal(Mu_Pavg,sigmaPavg),
+    Mu_Pavg ~ normal(0.5, 0.5),
+    sigmaPavg ~ exponential(1),
+    
+    ## omni model
+    O ~ normal(O_mu,O_sd),
+    O_mu <- Oavg[group],
+    O_sd ~ exponential(1),
+    Oavg[group] ~ normal(Mu_Oavg,sigmaOavg),
+    Mu_Oavg ~ normal(0.5, 0.5),
+    sigmaOavg ~ exponential(1),
+    
+    ## children
+    C ~ normal(C_mu,C_sd), # >=0 constraint imposed later
+    C_mu <- Cavg[group],
+    C_sd ~ exponential(10), # prior pred implications: dens(rexp(1000, rate = 10))
+    Cavg[group] ~ normal(Mu_Cavg,sigmaCavg),
+    Mu_Cavg ~ normal(1,2),
+    sigmaCavg ~ exponential(1),
+    
+    ## priors
+    a ~ normal(0,1.5),
+    c(bM, bP, bO, bC, bS, border, bcheck) ~ normal(0,1),
+    
+    ## varying intercepts and slopes
+    c(aj, bMj , bPj , bOj)[group] ~ dmvnormNC( Sigmaj , Rhoj ),
+    Sigmaj ~ dexp(1),
+    Rhoj ~ dlkjcorr(4),
+    
+    ## imputation distributions below
+    S ~ bernoulli(phi_S),
+    phi_S ~ beta(1,1),
+    check ~ bernoulli(phi_check),
+    phi_check ~ beta(1,1),
+    order ~ bernoulli(phi_order),
+    phi_order ~ beta(1,1)
+    
+  ),
+  
+  constraints=list(
+    phi_S="lower=0,upper=1",
+    phi_check="lower=0,upper=1",
+    phi_order="lower=0,upper=1",
+    C_impute="lower=0",
+    M_impute="lower=0,upper=1",
+    P_impute="lower=0,upper=1",
+    O_impute="lower=0,upper=1"
+  ),
+  data=dat_list ,
+  sample=FALSE ,
+  do_discrete_imputation = TRUE)
+}
+
+m_rag_self_add_prep <- rag_add_prep_fun(rag_self_dat_list)
+
+# amend Stan code
+m_rag_self_add_stan <- rag_stancode_fun(m_rag_self_add_prep)
+
+## fit model in CmdStan
+m_rag_self_add_cmdstan_fit <- cmdstanfit_fun(m_rag_self_add_stan, m_rag_self_add_prep)
+
+
+```
+
+```{r rag-self-add-check, include = TRUE}
+
+add_check_fun <- function(prep, fit) {
+
+### quick MCMC diagnostic check
+fit$diagnostic_summary()
+
+### posterior predictive check
+ppc_site_fun(prep, fit)
+
+### coefficient plot
+add_pars <- c("bM", "bO", "bP", "bS", "bC", "border", "bcheck")
+
+coef_fun(fit, add_pars)
+
+}
+
+add_check_fun(m_rag_self_add_prep, m_rag_self_add_cmdstan_fit)
+
+```
+
+```{r rag-self-add-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_self_add_prep, m_rag_self_add_cmdstan_fit)
+
+```
+
+```{r rag-self-add-trank, include = TRUE, warning = FALSE}
+add_trank_fun <- function(fit) {
+  add_pars <- c("bM", "bO", "bP", "bS", "bC", "border", "bcheck")
+  trankplot(rstan::read_stan_csv(fit$output_files()), pars = add_pars)
+}
+
+add_trank_fun(m_rag_self_add_cmdstan_fit)
+
+```
+
+```{r rag-self-loo, include = TRUE}
+
+loo_compare(m_rag_self_int_cmdstan_fit$loo(),m_rag_self_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## RAG LOCAL INT
+
+```{r rag-local-int}
+### Select RAG LOCAL variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==1 & full_df$SELF==0 ) # Only RAG LOCAL and non-missing outcome
+
+rag_local_dat_list <- with(full_df,
+                 list(
+                 id = NEW.ID[y_notmiss],
+                 group = GROUP[y_notmiss],
+                 M = BGD.MORPROP[y_notmiss],
+                 C = CHILDREN[y_notmiss],
+                 S = MAT[y_notmiss],
+                 P = DIEPUN[y_notmiss],
+                 O = OMNI.BG[y_notmiss],
+                 y = Y[y_notmiss],
+                 order = RAG.ORDER[y_notmiss],
+                 check = RAG.CHECK[y_notmiss],
+                 type = SELF[y_notmiss]
+                 )
+               )
+
+rag_local_dat_list$N <- length(rag_local_dat_list$y)
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+m_rag_local_int_prep <- rag_int_prep_fun(rag_local_dat_list)
+
+# amend Stan code
+m_rag_local_int_stan <- rag_stancode_fun(m_rag_local_int_prep)
+
+## fit model in CmdStan
+m_rag_local_int_cmdstan_fit <- cmdstanfit_fun(m_rag_local_int_stan, m_rag_local_int_prep)
+
+```
+
+```{r rag-local-int-check, include = TRUE}
+
+int_check_fun(m_rag_local_int_prep, m_rag_local_int_cmdstan_fit)
+
+```
+
+```{r rag-local-int-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_local_int_prep, m_rag_local_int_cmdstan_fit)
+
+```
+
+```{r rag-local-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_rag_local_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## RAG LOCAL ADD
+
+```{r rag-local-add}
+### Prepare additive model and model data with rethinking
+m_rag_local_add_prep <- rag_add_prep_fun(rag_local_dat_list)
+
+# amend Stan code
+m_rag_local_add_stan <- rag_stancode_fun(m_rag_local_add_prep)
+
+## fit model in CmdStan
+m_rag_local_add_cmdstan_fit <- cmdstanfit_fun(m_rag_local_add_stan, m_rag_local_add_prep)
+
+```
+
+```{r rag-local-add-check, include = TRUE}
+
+add_check_fun(m_rag_local_add_prep, m_rag_local_add_cmdstan_fit)
+
+```
+
+```{r rag-local-add-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_local_add_prep, m_rag_local_add_cmdstan_fit)
+
+```
+
+```{r rag-local-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_rag_local_add_cmdstan_fit)
+
+```
+
+```{r rag-local-loo, include = TRUE}
+
+loo_compare(m_rag_local_int_cmdstan_fit$loo(),m_rag_local_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## DG SELF INT
+
+```{r dg-self-int}
+### Select DG SELF variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==0 & full_df$SELF==1 ) # Only DG SELF and non-missing outcome
+
+dg_self_dat_list <- with(full_df,
+                 list(
+                   id = NEW.ID[y_notmiss],
+                   group = GROUP[y_notmiss],
+                   M = BGD.MORPROP[y_notmiss],
+                   S = MAT[y_notmiss],
+                   order = DG.ORDER[y_notmiss],
+                   check = DG.CHECK[y_notmiss],
+                   type = SELF[y_notmiss],
+                   C = CHILDREN[y_notmiss],
+                   P = DIEPUN[y_notmiss],
+                   O = OMNI.BG[y_notmiss],
+                   y = Y[y_notmiss]+1)
+                 )
+
+# remove Coastal Tanna, which have no free-list data for the DG game participants
+dg_self_dat_list <- as.data.frame(dg_self_dat_list)[as.data.frame(dg_self_dat_list)$group != "Coastal Tanna",] |> as.list()
+dg_self_dat_list$group <- as.factor(dg_self_dat_list$group)
+
+dg_self_dat_list$N <- length(dg_self_dat_list$y)
+dg_self_dat_list$K <- as.integer(max(dg_self_dat_list$y))
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+
+dg_int_prep_fun <- function(dat_list) {
+  map2stan(
+  alist(
+    ## coin model
+    y ~ dordlogit(eta, cutpoints),
+    
+    eta <- (bM+bMj[group])*M + (bO+bOj[group])*O + (bP+bPj[group])*P +
+      (bMP+bMPj[group])*M*P + (bMO+bMOj[group])*M*O +
+      (bPO+bPOj[group])*P*O + (bMPO+bMPOj[group])*M*P*O +
+      bC*C + bS*S +
+      border*order + bcheck*check,
+    
+    ## cutpoints
+    cutpoints ~ normal(0,2),
+    
+    ## morality model
+    M ~ normal(M_mu,M_sd),
+    M_mu <- Mavg[group],
+    M_sd ~ exponential(1),
+    Mavg[group] ~ normal(Mu_Mavg,sigmaMavg),
+    Mu_Mavg ~ normal(0.5, 0.5),
+    sigmaMavg ~ exponential(1),
+    
+    ## pun model
+    P ~ normal(P_mu,P_sd),
+    P_mu <- Pavg[group],
+    P_sd ~ exponential(1),
+    Pavg[group] ~ normal(Mu_Pavg,sigmaPavg),
+    Mu_Pavg ~ normal(0.5, 0.5),
+    sigmaPavg ~ exponential(1),
+    
+    ## omni model
+    O ~ normal(O_mu,O_sd),
+    O_mu <- Oavg[group],
+    O_sd ~ exponential(1),
+    Oavg[group] ~ normal(Mu_Oavg,sigmaOavg),
+    Mu_Oavg ~ normal(0.5, 0.5),
+    sigmaOavg ~ exponential(1),
+    
+    ## children
+    C ~ normal(C_mu,C_sd), # >=0 constraint imposed later
+    C_mu <- Cavg[group],
+    C_sd ~ exponential(10), # prior pred implications: dens(rexp(1000, rate = 10))
+    Cavg[group] ~ normal(Mu_Cavg,sigmaCavg),
+    Mu_Cavg ~ normal(1,2),
+    sigmaCavg ~ exponential(1),
+    
+    ## priors
+    c(bM, bP, bO, bMP, bMO, bPO, bMPO, bC, bS, border, bcheck, btype) ~ normal(0,1),
+    
+    ## varying intercepts and slopes
+    c(bMj , bPj , bOj, bMPj, bMOj, bPOj, bMPOj)[group] ~ dmvnormNC( Sigmaj , Rhoj ),
+    Sigmaj ~ dexp(1),
+    Rhoj ~ dlkjcorr(4),
+    
+    ## imputation distributions below
+    S ~ bernoulli(phi_S),
+    phi_S ~ beta(1,1),
+    check ~ bernoulli(phi_check),
+    phi_check ~ beta(1,1)
+  ),
+  
+  constraints=list(
+    phi_S="lower=0,upper=1",
+    phi_check="lower=0,upper=1",
+    C_impute="lower=0",
+    M_impute="lower=0,upper=1",
+    P_impute="lower=0,upper=1",
+    O_impute="lower=0,upper=1"
+  ),
+  data=dat_list ,
+  sample=FALSE, 
+  do_discrete_imputation = TRUE)
+}
+
+m_dg_self_int_prep <- dg_int_prep_fun(dg_self_dat_list)
+
+dg_stancode_fun <- function(prep) {
+  
+### Additions/modifications to rethinking-generated Stan code:
+# in data block:
+# int<lower=2> K;
+# in parameter block: 
+# ordered[K-1] cutpoints;
+# in generated quantities block:
+# add to the other vectors:
+#   vector[N] yrep;
+#   vector[N] log_lik;
+# add at the end of the gq block (eta needs to be defined/computed before it can be used here):
+#   for (i in 1:N) {
+#   yrep[i] = ordered_logistic_rng(eta[i], cutpoints);
+#   }
+#   for (i in 1:N) {
+#   log_lik[i] = ordered_logistic_lpmf( y[i] | eta[i] , cutpoints );
+#   }
+# 
+# This is automated in the following by extracting the model code string and then using gsub():
+
+# extract raw Stan code
+prep_code <- rethinking::stancode(prep)
+
+# amend raw Stan code
+prep_code_db <- gsub("int<lower=1> N;", 
+                          "int<lower=1> N;
+                      int<lower=2> K;", prep_code, fixed=TRUE)
+
+prep_code_pb <- gsub("ordered cutpoints;", 
+                          "ordered[K-1] cutpoints;", prep_code_db, fixed=TRUE)
+
+prep_code_gq <- gsub("generated quantities{", 
+                          "generated quantities{ 
+                      vector[N] yrep; 
+                      vector[N] log_lik;", prep_code_pb, fixed=TRUE)
+
+prep_code_gq_stan <- gsub("check_impute[i] = check[i];\n        }\n    }//i", 
+                       "check_impute[i] = check[i];\n        }\n    }//i 
+                      for (i in 1:N) yrep[i] = ordered_logistic_rng(eta[i], cutpoints);
+                      for (i in 1:N) log_lik[i] = ordered_logistic_lpmf( y[i] | eta[i] , cutpoints );", 
+                       prep_code_gq, fixed=TRUE)
+
+return(prep_code_gq_stan)
+
+}
+
+# amend Stan code
+m_dg_self_int_stan <- dg_stancode_fun(m_dg_self_int_prep)
+
+## fit model in CmdStan
+m_dg_self_int_cmdstan_fit <- cmdstanfit_fun(m_dg_self_int_stan, m_dg_self_int_prep)
+
+```
+
+```{r dg-self-int-check, include = TRUE}
+### posterior predictive check
+ppc_site_fun <- function(prep, fit) {
+  fit_draws <- fit$draws("yrep") |> posterior::as_draws_matrix()
+
+  fitnrow <- nrow(fit_draws)
+
+  idnrow <- length(unique(prep$data[["id"]]))
+
+  fit_yrep <- fit_draws[1:fitnrow,1:idnrow]
+
+  ppc_bars_grouped(y = prep$data[["y"]],
+                 yrep = fit_yrep,
+                 group = prep$data[["group"]],
+                 size = 0.2,
+                 facet_args = list(ncol=3), # set number of columns
+                 freq = TRUE) + # easier to compare groups with proportions, instead of counts
+  xlab("Number of coins allocated to DISTANT cup") +
+  theme(legend.position = "none") # remove legend
+  
+}
+
+### coefficient plot
+coef_fun <- function(fit, pars){
+  
+  fit_pars <- fit$draws(pars) |> posterior::as_draws_matrix()
+  
+  mcmc_areas(fit_pars, prob = 0.8) + xlab("Raw coefficient (log odds)") + ylab("Focal parameters")
+
+  
+}
+
+int_check_fun <- function(prep, fit) {
+
+### quick MCMC diagnostic check
+fit$diagnostic_summary()
+
+int_pars <- c("bM", "bO", "bP", "bMP", "bMO", "bMPO", "bS", "bC", "border", "bcheck")
+
+coef_fun(fit, int_pars)
+
+}
+
+int_check_fun(m_dg_self_int_prep, m_dg_self_int_cmdstan_fit)
+
+```
+
+```{r dg-self-int-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_self_int_prep, m_dg_self_int_cmdstan_fit)
+
+```
+
+```{r dg-self-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_dg_self_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## DG SELF ADD
+
+```{r dg-self-add}
+### Prepare additive model and model data with rethinking
+dg_add_prep_fun <- function(dat_list) {
+  map2stan(
+  alist(
+    ## coin model
+    y ~ dordlogit(eta, cutpoints),
+    
+    eta <- (bM+bMj[group])*M + (bO+bOj[group])*O + (bP+bPj[group])*P +
+      bC*C + bS*S +
+      border*order + bcheck*check,
+    
+    ## cutpoints
+    cutpoints ~ normal(0,2),
+    
+    ## morality model
+    M ~ normal(M_mu,M_sd),
+    M_mu <- Mavg[group],
+    M_sd ~ exponential(1),
+    Mavg[group] ~ normal(Mu_Mavg,sigmaMavg),
+    Mu_Mavg ~ normal(0.5, 0.5),
+    sigmaMavg ~ exponential(1),
+    
+    ## pun model
+    P ~ normal(P_mu,P_sd),
+    P_mu <- Pavg[group],
+    P_sd ~ exponential(1),
+    Pavg[group] ~ normal(Mu_Pavg,sigmaPavg),
+    Mu_Pavg ~ normal(0.5, 0.5),
+    sigmaPavg ~ exponential(1),
+    
+    ## omni model
+    O ~ normal(O_mu,O_sd),
+    O_mu <- Oavg[group],
+    O_sd ~ exponential(1),
+    Oavg[group] ~ normal(Mu_Oavg,sigmaOavg),
+    Mu_Oavg ~ normal(0.5, 0.5),
+    sigmaOavg ~ exponential(1),
+    
+    ## children
+    C ~ normal(C_mu,C_sd), # >=0 constraint imposed later
+    C_mu <- Cavg[group],
+    C_sd ~ exponential(10), # prior pred implications: dens(rexp(1000, rate = 10))
+    Cavg[group] ~ normal(Mu_Cavg,sigmaCavg),
+    Mu_Cavg ~ normal(1,2),
+    sigmaCavg ~ exponential(1),
+    
+    ## priors
+    c(bM, bP, bO, bC, bS, border, bcheck, btype) ~ normal(0,1),
+    
+    ## varying intercepts and slopes
+    c(bMj , bPj , bOj)[group] ~ dmvnormNC( Sigmaj , Rhoj ),
+    Sigmaj ~ dexp(1),
+    Rhoj ~ dlkjcorr(4),
+    
+    ## imputation distributions below
+    S ~ bernoulli(phi_S),
+    phi_S ~ beta(1,1),
+    check ~ bernoulli(phi_check),
+    phi_check ~ beta(1,1)
+  ),
+  
+  constraints=list(
+    phi_S="lower=0,upper=1",
+    phi_check="lower=0,upper=1",
+    C_impute="lower=0",
+    M_impute="lower=0,upper=1",
+    P_impute="lower=0,upper=1",
+    O_impute="lower=0,upper=1"
+  ),
+  data=dat_list ,
+  sample=FALSE, 
+  do_discrete_imputation = TRUE)
+}
+
+m_dg_self_add_prep <- dg_add_prep_fun(dg_self_dat_list)
+
+# amend Stan code
+m_dg_self_add_stan <- dg_stancode_fun(m_dg_self_add_prep)
+
+## fit model in CmdStan
+m_dg_self_add_cmdstan_fit <- cmdstanfit_fun(m_dg_self_add_stan, m_dg_self_add_prep)
+
+```
+
+```{r dg-self-add-check, include = TRUE}
+
+add_check_fun <- function(prep, fit) {
+
+### quick MCMC diagnostic check
+fit$diagnostic_summary()
+
+### posterior predictive check
+ppc_site_fun(prep, fit)
+
+### coefficient plot
+add_pars <- c("bM", "bO", "bP", "bS", "bC", "border", "bcheck")
+
+coef_fun(fit, add_pars)
+
+}
+
+add_check_fun(m_dg_self_add_prep, m_dg_self_add_cmdstan_fit)
+
+```
+
+```{r dg-self-add-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_self_add_prep, m_dg_self_add_cmdstan_fit)
+
+```
+
+```{r dg-self-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_dg_self_add_cmdstan_fit)
+
+```
+
+```{r dg-self-loo, include = TRUE}
+
+loo_compare(m_dg_self_int_cmdstan_fit$loo(),m_dg_self_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## DG LOCAL INT
+
+```{r dg-local-int}
+### Select DG LOCAL variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==0 & full_df$SELF==0 ) # Only DG LOCAL and non-missing outcome
+
+dg_local_dat_list <- with(full_df,
+                 list(
+                 id = NEW.ID[y_notmiss],
+                 group = GROUP[y_notmiss],
+                 M = BGD.MORPROP[y_notmiss],
+                 C = CHILDREN[y_notmiss],
+                 S = MAT[y_notmiss],
+                 P = DIEPUN[y_notmiss],
+                 O = OMNI.BG[y_notmiss],
+                 y = Y[y_notmiss]+1,
+                 order = DG.ORDER[y_notmiss],
+                 check = DG.CHECK[y_notmiss],
+                 type = SELF[y_notmiss]
+                 )
+               )
+
+# remove Coastal Tanna, which have no free-list data for the DG game participants
+dg_local_dat_list <- as.data.frame(dg_local_dat_list)[as.data.frame(dg_local_dat_list)$group != "Coastal Tanna",] |> as.list()
+dg_local_dat_list$group <- as.factor(dg_local_dat_list$group)
+
+dg_local_dat_list$N <- length(dg_local_dat_list$y)
+dg_local_dat_list$K <- as.integer(max(dg_local_dat_list$y))
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+
+m_dg_local_int_prep <- dg_int_prep_fun(dg_local_dat_list)
+
+# amend Stan code
+m_dg_local_int_stan <- dg_stancode_fun(m_dg_local_int_prep)
+
+## fit model in CmdStan
+m_dg_local_int_cmdstan_fit <- cmdstanfit_fun(m_dg_local_int_stan, m_dg_local_int_prep)
+
+```
+
+```{r dg-local-int-check, include = TRUE}
+
+int_check_fun(m_dg_local_int_prep, m_dg_local_int_cmdstan_fit)
+
+```
+
+```{r dg-local-int-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_local_int_prep, m_dg_local_int_cmdstan_fit)
+
+```
+
+```{r dg-local-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_dg_local_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## DG LOCAL ADD
+
+```{r dg-local-add}
+### Prepare additive model and model data with rethinking
+m_dg_local_add_prep <- dg_add_prep_fun(dg_local_dat_list)
+
+# amend Stan code
+m_dg_local_add_stan <- dg_stancode_fun(m_dg_local_add_prep)
+
+## fit model in CmdStan
+m_dg_local_add_cmdstan_fit <- cmdstanfit_fun(m_dg_local_add_stan, m_dg_local_add_prep)
+
+```
+
+```{r dg-local-add-check, include = TRUE}
+
+add_check_fun(m_dg_local_add_prep, m_dg_local_add_cmdstan_fit)
+
+```
+
+```{r dg-local-add-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_local_add_prep, m_dg_local_add_cmdstan_fit)
+
+```
+
+```{r dg-local-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_dg_local_add_cmdstan_fit)
+
+```
+
+```{r dg-local-loo, include = TRUE}
+
+loo_compare(m_dg_local_int_cmdstan_fit$loo(),m_dg_local_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## RAG INDEX SELF INT
+
+```{r rag-index-self-int}
+### Select RAG SELF variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==1 & full_df$SELF==1 ) # Only RAG SELF and non-missing outcome
+
+rag_index_self_dat_list <- with(full_df,
+                 list(
+                   id = NEW.ID[y_notmiss],
+                   group = GROUP[y_notmiss],
+                   M = MORINDEX[y_notmiss],
+                   C = CHILDREN[y_notmiss],
+                   S = MAT[y_notmiss],
+                   P = DIEPUN[y_notmiss],
+                   O = OMNI.BG[y_notmiss],
+                   y = Y[y_notmiss],
+                   order = RAG.ORDER[y_notmiss],
+                   check = RAG.CHECK[y_notmiss],
+                   type = SELF[y_notmiss]
+                 )
+)
+
+# remove Hadza, which responded on a different morality scale
+rag_index_self_dat_list <- as.data.frame(rag_index_self_dat_list)[as.data.frame(rag_index_self_dat_list)$group != "Hadza",] |> as.list()
+rag_index_self_dat_list$group <- as.factor(rag_index_self_dat_list$group)
+
+rag_index_self_dat_list$N <- length(rag_index_self_dat_list$y)
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+
+rag_index_int_prep_fun <- function(dat_list) {
+  map2stan(
+  alist(
+    ## coin model
+    y ~ dbinom(30,p),
+    
+    logit(p) <- a + aj[group] +
+      (bM+bMj[group])*M + (bO+bOj[group])*O + (bP+bPj[group])*P +
+      (bMP+bMPj[group])*M*P + (bMO+bMOj[group])*M*O +
+      (bPO+bPOj[group])*P*O + (bMPO+bMPOj[group])*M*P*O +
+      bC*C + bS*S + border*order + bcheck*check,
+    
+    ## morality model
+    M ~ normal(M_mu,M_sd),
+    M_mu <- Mavg[group],
+    M_sd ~ exponential(1),
+    Mavg[group] ~ normal(Mu_Mavg,sigmaMavg),
+    Mu_Mavg ~ normal(2.5, 1.5),
+    sigmaMavg ~ exponential(1),
+    
+    ## pun model
+    P ~ normal(P_mu,P_sd),
+    P_mu <- Pavg[group],
+    P_sd ~ exponential(1),
+    Pavg[group] ~ normal(Mu_Pavg,sigmaPavg),
+    Mu_Pavg ~ normal(0.5, 0.5),
+    sigmaPavg ~ exponential(1),
+    
+    ## omni model
+    O ~ normal(O_mu,O_sd),
+    O_mu <- Oavg[group],
+    O_sd ~ exponential(1),
+    Oavg[group] ~ normal(Mu_Oavg,sigmaOavg),
+    Mu_Oavg ~ normal(0.5, 0.5),
+    sigmaOavg ~ exponential(1),
+    
+    ## children
+    C ~ normal(C_mu,C_sd), # >=0 constraint imposed later
+    C_mu <- Cavg[group],
+    C_sd ~ exponential(10), # prior pred implications: dens(rexp(1000, rate = 10))
+    Cavg[group] ~ normal(Mu_Cavg,sigmaCavg),
+    Mu_Cavg ~ normal(1,2),
+    sigmaCavg ~ exponential(1),
+    
+    ## priors
+    a ~ normal(0,1.5),
+    c(bM, bP, bO, bMP, bMO, bPO, bMPO, bC, bS, border, bcheck) ~ normal(0,1),
+    
+    ## varying intercepts and slopes
+    c(aj, bMj , bPj , bOj, bMPj, bMOj, bPOj, bMPOj)[group] ~ dmvnormNC( Sigmaj , Rhoj ),
+    Sigmaj ~ dexp(1),
+    Rhoj ~ dlkjcorr(4),
+    
+    ## imputation distributions below
+    S ~ bernoulli(phi_S),
+    phi_S ~ beta(1,1),
+    check ~ bernoulli(phi_check),
+    phi_check ~ beta(1,1),
+    order ~ bernoulli(phi_order),
+    phi_order ~ beta(1,1)
+    
+  ),
+  
+  constraints=list(
+    phi_S="lower=0,upper=1",
+    phi_check="lower=0,upper=1",
+    phi_order="lower=0,upper=1",
+    C_impute="lower=0",
+    M_impute="lower=0,upper=4",
+    P_impute="lower=0,upper=1",
+    O_impute="lower=0,upper=1"
+  ),
+  data=dat_list ,
+  sample=FALSE ,
+  do_discrete_imputation = TRUE)
+}
+
+m_rag_index_self_int_prep <- rag_index_int_prep_fun(rag_index_self_dat_list)
+
+rag_stancode_fun <- function(prep) {
+  
+  ### Add to Stan code:
+  # in generated quantities (top):
+  # vector[N] yrep;
+  # vector[N] log_lik;
+  # in generated quantities (pi needs to be defined/computed before it can be used here)
+  # for ( i in 1:N ) yrep[i] = binomial_rng(30, inv_logit(p[i]));
+  # for ( i in 1:N ) log_lik[i] = binomial_logit_lpmf( y[i] | 30 , p[i] );
+
+# extract raw Stan code
+prep_code <- rethinking::stancode(prep)
+
+# amend raw Stan code
+prep_code_gq <- gsub("vector[N] S_impute;", 
+                            "vector[N] S_impute;
+                      vector[N] yrep;
+                      vector[N] log_lik;", prep_code, fixed=TRUE)
+
+prep_code_gq_stan <- gsub("check_impute[i] = check[i];\n        }\n    }//i", 
+                         "check_impute[i] = check[i];\n        }\n    }//i
+                      for ( i in 1:N ) yrep[i] = binomial_rng(30, inv_logit(p[i]));
+                      for ( i in 1:N ) log_lik[i] = binomial_logit_lpmf( y[i] | 30 , p[i] );", prep_code_gq, fixed=TRUE)
+ 
+return(prep_code_gq_stan)
+
+}
+
+# amend Stan code
+m_rag_index_self_int_stan <- rag_stancode_fun(m_rag_index_self_int_prep)
+
+## fit model in CmdStan
+m_rag_index_self_int_cmdstan_fit <- cmdstanfit_fun(m_rag_index_self_int_stan, m_rag_index_self_int_prep)
+
+```
+
+```{r rag-index-self-int-check, include = TRUE}
+### posterior predictive check
+ppc_site_fun <- function(prep, fit) {
+  fit_draws <- fit$draws("yrep") |> posterior::as_draws_matrix()
+
+  fitnrow <- nrow(fit_draws)
+
+  idnrow <- length(unique(prep$data[["id"]]))
+
+  fit_yrep <- fit_draws[1:fitnrow,1:idnrow]
+
+  ppc_bars_grouped(y = prep$data[["y"]],
+                 yrep = fit_yrep,
+                 group = prep$data[["group"]],
+                 size = 0.2,
+                 facet_args = list(ncol=3), # set number of columns
+                 freq = TRUE) + # easier to compare groups with proportions, instead of counts
+  xlab("Number of coins allocated to DISTANT cup") +
+  theme(legend.position = "none") # remove legend
+  
+}
+
+### coefficient plot
+coef_fun <- function(fit, pars){
+  
+  fit_pars <- fit$draws(pars) |> posterior::as_draws_matrix()
+  
+  mcmc_areas(fit_pars, prob = 0.8) + xlab("Raw coefficient (log odds)") + ylab("Focal parameters")
+
+  
+}
+
+int_check_fun <- function(prep, fit) {
+
+### quick MCMC diagnostic check
+fit$diagnostic_summary()
+
+int_pars <- c("bM", "bO", "bP", "bMP", "bMO", "bMPO", "bS", "bC", "border", "bcheck")
+
+coef_fun(fit, int_pars)
+
+}
+
+int_check_fun(m_rag_index_self_int_prep, m_rag_index_self_int_cmdstan_fit)
+
+```
+
+```{r rag-index-self-int-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_index_self_int_prep, m_rag_index_self_int_cmdstan_fit)
+
+```
+
+```{r rag-index-self-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_rag_index_self_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## RAG INDEX SELF ADD
+
+```{r rag-index-self-add}
+### Prepare additive model and model data with rethinking
+rag_index_add_prep_fun <- function(dat_list) {
+  map2stan(
+  alist(
+    ## coin model
+    y ~ dbinom(30,p),
+    
+    logit(p) <- a + aj[group] +
+      (bM+bMj[group])*M + (bO+bOj[group])*O + (bP+bPj[group])*P +
+      bC*C + bS*S + border*order + bcheck*check,
+    
+    ## morality model
+    M ~ normal(M_mu,M_sd),
+    M_mu <- Mavg[group],
+    M_sd ~ exponential(1),
+    Mavg[group] ~ normal(Mu_Mavg,sigmaMavg),
+    Mu_Mavg ~ normal(2.5, 1.5),
+    sigmaMavg ~ exponential(1),
+    
+    ## pun model
+    P ~ normal(P_mu,P_sd),
+    P_mu <- Pavg[group],
+    P_sd ~ exponential(1),
+    Pavg[group] ~ normal(Mu_Pavg,sigmaPavg),
+    Mu_Pavg ~ normal(0.5, 0.5),
+    sigmaPavg ~ exponential(1),
+    
+    ## omni model
+    O ~ normal(O_mu,O_sd),
+    O_mu <- Oavg[group],
+    O_sd ~ exponential(1),
+    Oavg[group] ~ normal(Mu_Oavg,sigmaOavg),
+    Mu_Oavg ~ normal(0.5, 0.5),
+    sigmaOavg ~ exponential(1),
+    
+    ## children
+    C ~ normal(C_mu,C_sd), # >=0 constraint imposed later
+    C_mu <- Cavg[group],
+    C_sd ~ exponential(10), # prior pred implications: dens(rexp(1000, rate = 10))
+    Cavg[group] ~ normal(Mu_Cavg,sigmaCavg),
+    Mu_Cavg ~ normal(1,2),
+    sigmaCavg ~ exponential(1),
+    
+    ## priors
+    a ~ normal(0,1.5),
+    c(bM, bP, bO, bC, bS, border, bcheck) ~ normal(0,1),
+    
+    ## varying intercepts and slopes
+    c(aj, bMj , bPj , bOj)[group] ~ dmvnormNC( Sigmaj , Rhoj ),
+    Sigmaj ~ dexp(1),
+    Rhoj ~ dlkjcorr(4),
+    
+    ## imputation distributions below
+    S ~ bernoulli(phi_S),
+    phi_S ~ beta(1,1),
+    check ~ bernoulli(phi_check),
+    phi_check ~ beta(1,1),
+    order ~ bernoulli(phi_order),
+    phi_order ~ beta(1,1)
+    
+  ),
+  
+  constraints=list(
+    phi_S="lower=0,upper=1",
+    phi_check="lower=0,upper=1",
+    phi_order="lower=0,upper=1",
+    C_impute="lower=0",
+    M_impute="lower=0,upper=4",
+    P_impute="lower=0,upper=1",
+    O_impute="lower=0,upper=1"
+  ),
+  data=dat_list ,
+  sample=FALSE ,
+  do_discrete_imputation = TRUE)
+}
+
+m_rag_index_self_add_prep <- rag_index_add_prep_fun(rag_index_self_dat_list)
+
+# amend Stan code
+m_rag_index_self_add_stan <- rag_stancode_fun(m_rag_index_self_add_prep)
+
+## fit model in CmdStan
+m_rag_index_self_add_cmdstan_fit <- cmdstanfit_fun(m_rag_index_self_add_stan, m_rag_index_self_add_prep)
+
+
+```
+
+```{r rag-index-self-add-check, include = TRUE}
+
+add_check_fun <- function(prep, fit) {
+
+### quick MCMC diagnostic check
+fit$diagnostic_summary()
+
+### posterior predictive check
+ppc_site_fun(prep, fit)
+
+### coefficient plot
+add_pars <- c("bM", "bO", "bP", "bS", "bC", "border", "bcheck")
+
+coef_fun(fit, add_pars)
+
+}
+
+add_check_fun(m_rag_index_self_add_prep, m_rag_index_self_add_cmdstan_fit)
+
+```
+
+```{r rag-index-self-add-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_index_self_add_prep, m_rag_index_self_add_cmdstan_fit)
+
+```
+
+```{r rag-index-self-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_rag_index_self_add_cmdstan_fit)
+
+```
+
+```{r rag-index-self-loo, include = TRUE}
+
+loo_compare(m_rag_index_self_int_cmdstan_fit$loo(),m_rag_index_self_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## RAG INDEX LOCAL INT
+
+```{r rag-index-local-int}
+### Select RAG LOCAL variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==1 & full_df$SELF==0 ) # Only RAG LOCAL and non-missing outcome
+
+rag_index_local_dat_list <- with(full_df,
+                 list(
+                 id = NEW.ID[y_notmiss],
+                 group = GROUP[y_notmiss],
+                 M = MORINDEX[y_notmiss],
+                 C = CHILDREN[y_notmiss],
+                 S = MAT[y_notmiss],
+                 P = DIEPUN[y_notmiss],
+                 O = OMNI.BG[y_notmiss],
+                 y = Y[y_notmiss],
+                 order = RAG.ORDER[y_notmiss],
+                 check = RAG.CHECK[y_notmiss],
+                 type = SELF[y_notmiss]
+                 )
+               )
+# remove Hadza, which responded on a different morality scale
+rag_index_local_dat_list <- as.data.frame(rag_index_local_dat_list)[as.data.frame(rag_index_local_dat_list)$group != "Hadza",] |> as.list()
+
+rag_index_local_dat_list$group <- as.factor(rag_index_local_dat_list$group)
+
+rag_index_local_dat_list$N <- length(rag_index_local_dat_list$y)
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+
+m_rag_index_local_int_prep <- rag_index_int_prep_fun(rag_index_local_dat_list)
+
+# amend Stan code
+m_rag_index_local_int_stan <- rag_stancode_fun(m_rag_index_local_int_prep)
+
+## fit model in CmdStan
+m_rag_index_local_int_cmdstan_fit <- cmdstanfit_fun(m_rag_index_local_int_stan, m_rag_index_local_int_prep)
+
+```
+
+```{r rag-index-local-int-check, include = TRUE}
+
+int_check_fun(m_rag_local_int_prep, m_rag_local_int_cmdstan_fit)
+
+```
+
+```{r rag-index-local-int-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_index_local_int_prep, m_rag_index_local_int_cmdstan_fit)
+
+```
+
+```{r rag-index-local-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_rag_index_local_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## RAG INDEX LOCAL ADD
+
+```{r rag-index-local-add}
+### Prepare additive model and model data with rethinking
+m_rag_index_local_add_prep <- rag_index_add_prep_fun(rag_index_local_dat_list)
+
+# amend Stan code
+m_rag_index_local_add_stan <- rag_stancode_fun(m_rag_index_local_add_prep)
+
+## fit model in CmdStan
+m_rag_index_local_add_cmdstan_fit <- cmdstanfit_fun(m_rag_index_local_add_stan, m_rag_index_local_add_prep)
+
+```
+
+```{r rag-index-local-add-check, include = TRUE}
+
+add_check_fun(m_rag_index_local_add_prep, m_rag_index_local_add_cmdstan_fit)
+
+```
+
+```{r rag-index-local-add-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_index_local_add_prep, m_rag_index_local_add_cmdstan_fit)
+
+```
+
+```{r rag-index-local-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_rag_index_local_add_cmdstan_fit)
+
+```
+
+```{r rag-index-local-loo, include = TRUE}
+
+loo_compare(m_rag_index_local_int_cmdstan_fit$loo(),m_rag_index_local_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## DG INDEX SELF INT
+
+```{r dg-index-self-int}
+### Select DG SELF variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==0 & full_df$SELF==1 ) # Only DG SELF and non-missing outcome
+
+dg_index_self_dat_list <- with(full_df,
+                 list(
+                   id = NEW.ID[y_notmiss],
+                   group = GROUP[y_notmiss],
+                   M = MORINDEX[y_notmiss],
+                   S = MAT[y_notmiss],
+                   order = DG.ORDER[y_notmiss],
+                   check = DG.CHECK[y_notmiss],
+                   type = SELF[y_notmiss],
+                   C = CHILDREN[y_notmiss],
+                   P = DIEPUN[y_notmiss],
+                   O = OMNI.BG[y_notmiss],
+                   y = Y[y_notmiss]+1)
+                 )
+
+# remove Hadza, which responded on a different morality scale
+dg_index_self_dat_list <- as.data.frame(dg_index_self_dat_list)[as.data.frame(dg_index_self_dat_list)$group != "Hadza",] |> as.list()
+dg_index_self_dat_list$group <- as.factor(dg_index_self_dat_list$group)
+
+dg_index_self_dat_list$N <- length(dg_index_self_dat_list$y)
+dg_index_self_dat_list$K <- as.integer(max(dg_index_self_dat_list$y))
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+
+dg_index_int_prep_fun <- function(dat_list) {
+  map2stan(
+  alist(
+    ## coin model
+    y ~ dordlogit(eta, cutpoints),
+    
+    eta <- (bM+bMj[group])*M + (bO+bOj[group])*O + (bP+bPj[group])*P +
+      (bMP+bMPj[group])*M*P + (bMO+bMOj[group])*M*O +
+      (bPO+bPOj[group])*P*O + (bMPO+bMPOj[group])*M*P*O +
+      bC*C + bS*S +
+      border*order + bcheck*check,
+    
+    ## cutpoints
+    cutpoints ~ normal(0,2),
+    
+    ## morality model
+    M ~ normal(M_mu,M_sd),
+    M_mu <- Mavg[group],
+    M_sd ~ exponential(1),
+    Mavg[group] ~ normal(Mu_Mavg,sigmaMavg),
+    Mu_Mavg ~ normal(2.5, 1.5),
+    sigmaMavg ~ exponential(1),
+    
+    ## pun model
+    P ~ normal(P_mu,P_sd),
+    P_mu <- Pavg[group],
+    P_sd ~ exponential(1),
+    Pavg[group] ~ normal(Mu_Pavg,sigmaPavg),
+    Mu_Pavg ~ normal(0.5, 0.5),
+    sigmaPavg ~ exponential(1),
+    
+    ## omni model
+    O ~ normal(O_mu,O_sd),
+    O_mu <- Oavg[group],
+    O_sd ~ exponential(1),
+    Oavg[group] ~ normal(Mu_Oavg,sigmaOavg),
+    Mu_Oavg ~ normal(0.5, 0.5),
+    sigmaOavg ~ exponential(1),
+    
+    ## children
+    C ~ normal(C_mu,C_sd), # >=0 constraint imposed later
+    C_mu <- Cavg[group],
+    C_sd ~ exponential(10), # prior pred implications: dens(rexp(1000, rate = 10))
+    Cavg[group] ~ normal(Mu_Cavg,sigmaCavg),
+    Mu_Cavg ~ normal(1,2),
+    sigmaCavg ~ exponential(1),
+    
+    ## priors
+    c(bM, bP, bO, bMP, bMO, bPO, bMPO, bC, bS, border, bcheck, btype) ~ normal(0,1),
+    
+    ## varying intercepts and slopes
+    c(bMj , bPj , bOj, bMPj, bMOj, bPOj, bMPOj)[group] ~ dmvnormNC( Sigmaj , Rhoj ),
+    Sigmaj ~ dexp(1),
+    Rhoj ~ dlkjcorr(4),
+    
+    ## imputation distributions below
+    S ~ bernoulli(phi_S),
+    phi_S ~ beta(1,1),
+    check ~ bernoulli(phi_check),
+    phi_check ~ beta(1,1)
+  ),
+  
+  constraints=list(
+    phi_S="lower=0,upper=1",
+    phi_check="lower=0,upper=1",
+    C_impute="lower=0",
+    M_impute="lower=0,upper=4",
+    P_impute="lower=0,upper=1",
+    O_impute="lower=0,upper=1"
+  ),
+  data=dat_list ,
+  sample=FALSE, 
+  do_discrete_imputation = TRUE)
+}
+
+m_dg_index_self_int_prep <- dg_index_int_prep_fun(dg_index_self_dat_list)
+
+dg_stancode_fun <- function(prep) {
+  
+### Additions/modifications to rethinking-generated Stan code:
+# in data block:
+# int<lower=2> K;
+# in parameter block: 
+# ordered[K-1] cutpoints;
+# in generated quantities block:
+# add to the other vectors:
+#   vector[N] yrep;
+#   vector[N] log_lik;
+# add at the end of the gq block (eta needs to be defined/computed before it can be used here):
+#   for (i in 1:N) {
+#   yrep[i] = ordered_logistic_rng(eta[i], cutpoints);
+#   }
+#   for (i in 1:N) {
+#   log_lik[i] = ordered_logistic_lpmf( y[i] | eta[i] , cutpoints );
+#   }
+# 
+# This is automated in the following by extracting the model code string and then using gsub():
+
+# extract raw Stan code
+prep_code <- rethinking::stancode(prep)
+
+# amend raw Stan code
+prep_code_db <- gsub("int<lower=1> N;", 
+                          "int<lower=1> N;
+                      int<lower=2> K;", prep_code, fixed=TRUE)
+
+prep_code_pb <- gsub("ordered cutpoints;", 
+                          "ordered[K-1] cutpoints;", prep_code_db, fixed=TRUE)
+
+prep_code_gq <- gsub("generated quantities{", 
+                          "generated quantities{ 
+                      vector[N] yrep; 
+                      vector[N] log_lik;", prep_code_pb, fixed=TRUE)
+
+prep_code_gq_stan <- gsub("check_impute[i] = check[i];\n        }\n    }//i", 
+                       "check_impute[i] = check[i];\n        }\n    }//i 
+                      for (i in 1:N) yrep[i] = ordered_logistic_rng(eta[i], cutpoints);
+                      for (i in 1:N) log_lik[i] = ordered_logistic_lpmf( y[i] | eta[i] , cutpoints );", 
+                       prep_code_gq, fixed=TRUE)
+
+return(prep_code_gq_stan)
+
+}
+
+# amend Stan code
+m_dg_index_self_int_stan <- dg_stancode_fun(m_dg_self_int_prep)
+
+## fit model in CmdStan
+m_dg_index_self_int_cmdstan_fit <- cmdstanfit_fun(m_dg_index_self_int_stan, m_dg_index_self_int_prep)
+
+```
+
+```{r dg-index-self-int-check, include = TRUE}
+### posterior predictive check
+ppc_site_fun <- function(prep, fit) {
+  fit_draws <- fit$draws("yrep") |> posterior::as_draws_matrix()
+
+  fitnrow <- nrow(fit_draws)
+
+  idnrow <- length(unique(prep$data[["id"]]))
+
+  fit_yrep <- fit_draws[1:fitnrow,1:idnrow]
+
+  ppc_bars_grouped(y = prep$data[["y"]],
+                 yrep = fit_yrep,
+                 group = prep$data[["group"]],
+                 size = 0.2,
+                 facet_args = list(ncol=3), # set number of columns
+                 freq = TRUE) + # easier to compare groups with proportions, instead of counts
+  xlab("Number of coins allocated to DISTANT cup") +
+  theme(legend.position = "none") # remove legend
+  
+}
+
+### coefficient plot
+coef_fun <- function(fit, pars){
+  
+  fit_pars <- fit$draws(pars) |> posterior::as_draws_matrix()
+  
+  mcmc_areas(fit_pars, prob = 0.8) + xlab("Raw coefficient (log odds)") + ylab("Focal parameters")
+
+  
+}
+
+int_check_fun <- function(prep, fit) {
+
+### quick MCMC diagnostic check
+fit$diagnostic_summary()
+
+int_pars <- c("bM", "bO", "bP", "bMP", "bMO", "bMPO", "bS", "bC", "border", "bcheck")
+
+coef_fun(fit, int_pars)
+
+}
+
+int_check_fun(m_dg_index_self_int_prep, m_dg_index_self_int_cmdstan_fit)
+
+```
+
+```{r dg-index-self-int-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_index_self_int_prep, m_dg_index_self_int_cmdstan_fit)
+
+```
+
+```{r dg-index-self-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_dg_index_self_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## DG INDEX SELF ADD
+
+```{r dg-index-self-add}
+### Prepare additive model and model data with rethinking
+dg_index_add_prep_fun <- function(dat_list) {
+  map2stan(
+  alist(
+    ## coin model
+    y ~ dordlogit(eta, cutpoints),
+    
+    eta <- (bM+bMj[group])*M + (bO+bOj[group])*O + (bP+bPj[group])*P +
+      bC*C + bS*S +
+      border*order + bcheck*check,
+    
+    ## cutpoints
+    cutpoints ~ normal(0,2),
+    
+    ## morality model
+    M ~ normal(M_mu,M_sd),
+    M_mu <- Mavg[group],
+    M_sd ~ exponential(1),
+    Mavg[group] ~ normal(Mu_Mavg,sigmaMavg),
+    Mu_Mavg ~ normal(0.5, 0.5),
+    sigmaMavg ~ exponential(1),
+    
+    ## pun model
+    P ~ normal(P_mu,P_sd),
+    P_mu <- Pavg[group],
+    P_sd ~ exponential(1),
+    Pavg[group] ~ normal(Mu_Pavg,sigmaPavg),
+    Mu_Pavg ~ normal(0.5, 0.5),
+    sigmaPavg ~ exponential(1),
+    
+    ## omni model
+    O ~ normal(O_mu,O_sd),
+    O_mu <- Oavg[group],
+    O_sd ~ exponential(1),
+    Oavg[group] ~ normal(Mu_Oavg,sigmaOavg),
+    Mu_Oavg ~ normal(0.5, 0.5),
+    sigmaOavg ~ exponential(1),
+    
+    ## children
+    C ~ normal(C_mu,C_sd), # >=0 constraint imposed later
+    C_mu <- Cavg[group],
+    C_sd ~ exponential(10), # prior pred implications: dens(rexp(1000, rate = 10))
+    Cavg[group] ~ normal(Mu_Cavg,sigmaCavg),
+    Mu_Cavg ~ normal(1,2),
+    sigmaCavg ~ exponential(1),
+    
+    ## priors
+    c(bM, bP, bO, bC, bS, border, bcheck, btype) ~ normal(0,1),
+    
+    ## varying intercepts and slopes
+    c(bMj , bPj , bOj)[group] ~ dmvnormNC( Sigmaj , Rhoj ),
+    Sigmaj ~ dexp(1),
+    Rhoj ~ dlkjcorr(4),
+    
+    ## imputation distributions below
+    S ~ bernoulli(phi_S),
+    phi_S ~ beta(1,1),
+    check ~ bernoulli(phi_check),
+    phi_check ~ beta(1,1)
+  ),
+  
+  constraints=list(
+    phi_S="lower=0,upper=1",
+    phi_check="lower=0,upper=1",
+    C_impute="lower=0",
+    M_impute="lower=0,upper=1",
+    P_impute="lower=0,upper=1",
+    O_impute="lower=0,upper=1"
+  ),
+  data=dat_list ,
+  sample=FALSE, 
+  do_discrete_imputation = TRUE)
+}
+
+m_dg_index_self_add_prep <- dg_index_add_prep_fun(dg_index_self_dat_list)
+
+# amend Stan code
+m_dg_index_self_add_stan <- dg_stancode_fun(m_dg_index_self_add_prep)
+
+## fit model in CmdStan
+m_dg_index_self_add_cmdstan_fit <- cmdstanfit_fun(m_dg_index_self_add_stan, m_dg_index_self_add_prep)
+
+```
+
+```{r dg-index-self-add-check, include = TRUE}
+
+add_check_fun <- function(prep, fit) {
+
+### quick MCMC diagnostic check
+fit$diagnostic_summary()
+
+### posterior predictive check
+ppc_site_fun(prep, fit)
+
+### coefficient plot
+add_pars <- c("bM", "bO", "bP", "bS", "bC", "border", "bcheck")
+
+coef_fun(fit, add_pars)
+
+}
+
+add_check_fun(m_dg_index_self_add_prep, m_dg_index_self_add_cmdstan_fit)
+
+```
+
+```{r dg-index-self-add-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_index_self_add_prep, m_dg_index_self_add_cmdstan_fit)
+
+```
+
+```{r dg-index-self-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_dg_index_self_add_cmdstan_fit)
+
+```
+
+```{r dg-index-self-loo, include = TRUE}
+
+loo_compare(m_dg_index_self_int_cmdstan_fit$loo(),m_dg_index_self_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## DG INDEX LOCAL INT
+
+```{r dg-index-local-int}
+### Select DG LOCAL variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==0 & full_df$SELF==0 ) # Only DG LOCAL and non-missing outcome
+
+dg_index_local_dat_list <- with(full_df,
+                 list(
+                 id = NEW.ID[y_notmiss],
+                 group = GROUP[y_notmiss],
+                 M = MORINDEX[y_notmiss],
+                 C = CHILDREN[y_notmiss],
+                 S = MAT[y_notmiss],
+                 P = DIEPUN[y_notmiss],
+                 O = OMNI.BG[y_notmiss],
+                 y = Y[y_notmiss]+1,
+                 order = DG.ORDER[y_notmiss],
+                 check = DG.CHECK[y_notmiss],
+                 type = SELF[y_notmiss]
+                 )
+               )
+
+# remove Hadza, which responded on a different morality scale
+dg_index_local_dat_list <- as.data.frame(dg_index_local_dat_list)[as.data.frame(dg_index_local_dat_list)$group != "Hadza",] |> as.list()
+dg_index_local_dat_list$group <- as.factor(dg_index_local_dat_list$group)
+
+dg_index_local_dat_list$N <- length(dg_index_local_dat_list$y)
+dg_index_local_dat_list$K <- as.integer(max(dg_index_local_dat_list$y))
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+m_dg_index_local_int_prep <- dg_index_int_prep_fun(dg_index_local_dat_list)
+
+# amend Stan code
+m_dg_index_local_int_stan <- dg_stancode_fun(m_dg_index_local_int_prep)
+
+## fit model in CmdStan
+m_dg_index_local_int_cmdstan_fit <- cmdstanfit_fun(m_dg_index_local_int_stan, m_dg_index_local_int_prep)
+
+```
+
+```{r dg-index-local-int-check, include = TRUE}
+
+int_check_fun(m_dg_index_local_int_prep, m_dg_index_local_int_cmdstan_fit)
+
+```
+
+```{r dg-index-local-int-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_index_local_int_prep, m_dg_index_local_int_cmdstan_fit)
+
+```
+
+```{r dg-index-local-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_dg_index_local_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## DG INDEX LOCAL ADD
+
+```{r dg-index-local-add}
+### Prepare additive model and model data with rethinking
+m_dg_index_local_add_prep <- dg_index_add_prep_fun(dg_index_local_dat_list)
+
+# amend Stan code
+m_dg_index_local_add_stan <- dg_stancode_fun(m_dg_local_add_prep)
+
+## fit model in CmdStan
+m_dg_index_local_add_cmdstan_fit <- cmdstanfit_fun(m_dg_index_local_add_stan, m_dg_index_local_add_prep)
+
+```
+
+```{r dg-index-local-add-check, include = TRUE}
+
+add_check_fun(m_dg_index_local_add_prep, m_dg_index_local_add_cmdstan_fit)
+
+```
+
+```{r dg-index-local-add-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_index_local_add_prep, m_dg_index_local_add_cmdstan_fit)
+
+```
+
+```{r dg-index-local-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_dg_index_local_add_cmdstan_fit)
+
+```
+
+```{r dg-index-local-loo, include = TRUE}
+
+loo_compare(m_dg_index_local_int_cmdstan_fit$loo(),m_dg_index_local_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## RAG SPEC SELF INT
+
+```{r rag-spec-self-int}
+### Select RAG SELF variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==1 & full_df$SELF==1 ) # Only RAG SELF and non-missing outcome
+
+rag_spec_self_dat_list <- with(full_df,
+                 list(
+                 id = NEW.ID[y_notmiss],
+                 group = GROUP[y_notmiss],
+                 M = BGD.SPECPROP[y_notmiss],
+                 C = CHILDREN[y_notmiss],
+                 S = MAT[y_notmiss],
+                 P = DIEPUN[y_notmiss],
+                 O = OMNI.BG[y_notmiss],
+                 y = Y[y_notmiss],
+                 order = RAG.ORDER[y_notmiss],
+                 check = RAG.CHECK[y_notmiss],
+                 type = SELF[y_notmiss]
+                 )
+               )
+
+rag_spec_self_dat_list$N <- length(rag_spec_self_dat_list$y)
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+m_rag_spec_self_int_prep <- rag_int_prep_fun(rag_spec_self_dat_list)
+
+# amend Stan code
+m_rag_spec_self_int_stan <- rag_stancode_fun(m_rag_spec_self_int_prep)
+
+## fit model in CmdStan
+m_rag_spec_self_int_cmdstan_fit <- cmdstanfit_fun(m_rag_spec_self_int_stan, m_rag_spec_self_int_prep)
+
+```
+
+```{r rag-spec-self-int-check, include = TRUE}
+
+int_check_fun(m_rag_spec_self_int_prep, m_rag_spec_self_int_cmdstan_fit)
+
+```
+
+```{r rag-spec-self-int-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_spec_self_int_prep, m_rag_spec_self_int_cmdstan_fit)
+
+```
+
+```{r rag-spec-self-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_rag_spec_self_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## RAG SPEC SELF ADD
+
+```{r rag-spec-self-add}
+### Prepare additive model and model data with rethinking
+m_rag_spec_self_add_prep <- rag_add_prep_fun(rag_spec_self_dat_list)
+
+# amend Stan code
+m_rag_spec_self_add_stan <- rag_stancode_fun(m_rag_spec_self_add_prep)
+
+## fit model in CmdStan
+m_rag_spec_self_add_cmdstan_fit <- cmdstanfit_fun(m_rag_spec_self_add_stan, m_rag_spec_self_add_prep)
+
+
+```
+
+```{r rag-spec-self-add-check, include = TRUE}
+
+add_check_fun(m_rag_spec_self_add_prep, m_rag_spec_self_add_cmdstan_fit)
+
+```
+
+```{r rag-spec-self-add-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_spec_self_add_prep, m_rag_spec_self_add_cmdstan_fit)
+
+```
+
+```{r rag-spec-self-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_rag_spec_self_add_cmdstan_fit)
+
+```
+
+```{r rag-spec-self-loo, include = TRUE}
+
+loo_compare(m_rag_spec_self_int_cmdstan_fit$loo(),m_rag_spec_self_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## RAG SPEC LOCAL INT
+
+```{r rag-spec-local-int}
+### Select RAG LOCAL variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==1 & full_df$SELF==0 ) # Only RAG LOCAL and non-missing outcome
+
+rag_spec_local_dat_list <- with(full_df,
+                 list(
+                 id = NEW.ID[y_notmiss],
+                 group = GROUP[y_notmiss],
+                 M = BGD.SPECPROP[y_notmiss],
+                 C = CHILDREN[y_notmiss],
+                 S = MAT[y_notmiss],
+                 P = DIEPUN[y_notmiss],
+                 O = OMNI.BG[y_notmiss],
+                 y = Y[y_notmiss],
+                 order = RAG.ORDER[y_notmiss],
+                 check = RAG.CHECK[y_notmiss],
+                 type = SELF[y_notmiss]
+                 )
+               )
+
+rag_spec_local_dat_list$N <- length(rag_spec_local_dat_list$y)
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+m_rag_spec_local_int_prep <- rag_int_prep_fun(rag_spec_local_dat_list)
+
+# amend Stan code
+m_rag_spec_local_int_stan <- rag_stancode_fun(m_rag_spec_local_int_prep)
+
+## fit model in CmdStan
+m_rag_spec_local_int_cmdstan_fit <- cmdstanfit_fun(m_rag_spec_local_int_stan, m_rag_spec_local_int_prep)
+
+```
+
+```{r rag-spec-local-int-check, include = TRUE}
+
+int_check_fun(m_rag_spec_local_int_prep, m_rag_spec_local_int_cmdstan_fit)
+
+```
+
+```{r rag-spec-local-int-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_spec_local_int_prep, m_rag_spec_local_int_cmdstan_fit)
+
+```
+
+```{r rag-spec-local-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_rag_spec_local_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## RAG SPEC LOCAL ADD
+
+```{r rag-spec-local-add}
+### Prepare additive model and model data with rethinking
+m_rag_spec_local_add_prep <- rag_add_prep_fun(rag_spec_local_dat_list)
+
+# amend Stan code
+m_rag_spec_local_add_stan <- rag_stancode_fun(m_rag_spec_local_add_prep)
+
+## fit model in CmdStan
+m_rag_spec_local_add_cmdstan_fit <- cmdstanfit_fun(m_rag_spec_local_add_stan, m_rag_spec_local_add_prep)
+
+```
+
+```{r rag-spec-local-add-check, include = TRUE}
+
+add_check_fun(m_rag_spec_local_add_prep, m_rag_spec_local_add_cmdstan_fit)
+
+```
+
+```{r rag-spec-local-add-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_spec_local_add_prep, m_rag_spec_local_add_cmdstan_fit)
+
+```
+
+```{r rag-spec-local-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_rag_spec_local_add_cmdstan_fit)
+
+```
+
+```{r rag-spec-local-loo, include = TRUE}
+
+loo_compare(m_rag_spec_local_int_cmdstan_fit$loo(),m_rag_spec_local_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## DG SPEC SELF INT
+
+```{r dg-spec-self-int}
+### Select DG SELF variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==0 & full_df$SELF==1 ) # Only DG SELF and non-missing outcome
+
+dg_spec_self_dat_list <- with(full_df,
+                 list(
+                   id = NEW.ID[y_notmiss],
+                   group = GROUP[y_notmiss],
+                   M = BGD.SPECPROP[y_notmiss],
+                   S = MAT[y_notmiss],
+                   order = DG.ORDER[y_notmiss],
+                   check = DG.CHECK[y_notmiss],
+                   type = SELF[y_notmiss],
+                   C = CHILDREN[y_notmiss],
+                   P = DIEPUN[y_notmiss],
+                   O = OMNI.BG[y_notmiss],
+                   y = Y[y_notmiss]+1)
+                 )
+
+# remove Coastal Tanna, which have no free-list data for the DG game participants
+dg_spec_self_dat_list <- as.data.frame(dg_spec_self_dat_list)[as.data.frame(dg_spec_self_dat_list)$group != "Coastal Tanna",] |> as.list()
+dg_spec_self_dat_list$group <- as.factor(dg_spec_self_dat_list$group)
+
+dg_spec_self_dat_list$N <- length(dg_spec_self_dat_list$y)
+dg_spec_self_dat_list$K <- as.integer(max(dg_spec_self_dat_list$y))
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+m_dg_spec_self_int_prep <- dg_int_prep_fun(dg_spec_self_dat_list)
+
+# amend Stan code
+m_dg_spec_self_int_stan <- dg_stancode_fun(m_dg_spec_self_int_prep)
+
+## fit model in CmdStan
+m_dg_spec_self_int_cmdstan_fit <- cmdstanfit_fun(m_dg_spec_self_int_stan, m_dg_spec_self_int_prep)
+
+```
+
+```{r dg-spec-self-int-check, include = TRUE}
+
+int_check_fun(m_dg_spec_self_int_prep, m_dg_spec_self_int_cmdstan_fit)
+
+```
+
+```{r dg-spec-self-int-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_spec_self_int_prep, m_dg_spec_self_int_cmdstan_fit)
+
+```
+
+```{r dg-spec-self-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_dg_spec_self_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## DG SPEC SELF ADD
+
+```{r dg-spec-self-add}
+### Prepare additive model and model data with rethinking
+m_dg_spec_self_add_prep <- dg_add_prep_fun(dg_spec_self_dat_list)
+
+# amend Stan code
+m_dg_spec_self_add_stan <- dg_stancode_fun(m_dg_spec_self_add_prep)
+
+## fit model in CmdStan
+m_dg_spec_self_add_cmdstan_fit <- cmdstanfit_fun(m_dg_spec_self_add_stan, m_dg_spec_self_add_prep)
+
+```
+
+```{r dg-spec-self-add-check, include = TRUE}
+
+add_check_fun(m_dg_spec_self_add_prep, m_dg_spec_self_add_cmdstan_fit)
+
+```
+
+```{r dg-spec-self-add-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_spec_self_add_prep, m_dg_spec_self_add_cmdstan_fit)
+
+```
+
+```{r dg-spec-self-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_dg_spec_self_add_cmdstan_fit)
+
+```
+
+```{r dg-spec-self-loo, include = TRUE}
+
+loo_compare(m_dg_spec_self_int_cmdstan_fit$loo(),m_dg_spec_self_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## DG SPEC LOCAL INT
+
+```{r dg-spec-local-int}
+### Select DG LOCAL variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==0 & full_df$SELF==0 ) # Only DG LOCAL and non-missing outcome
+
+dg_spec_local_dat_list <- with(full_df,
+                 list(
+                 id = NEW.ID[y_notmiss],
+                 group = GROUP[y_notmiss],
+                 M = BGD.SPECPROP[y_notmiss],
+                 C = CHILDREN[y_notmiss],
+                 S = MAT[y_notmiss],
+                 P = DIEPUN[y_notmiss],
+                 O = OMNI.BG[y_notmiss],
+                 y = Y[y_notmiss]+1,
+                 order = DG.ORDER[y_notmiss],
+                 check = DG.CHECK[y_notmiss],
+                 type = SELF[y_notmiss]
+                 )
+               )
+
+# remove Coastal Tanna, which have no free-list data for the DG game participants
+dg_spec_local_dat_list <- as.data.frame(dg_spec_local_dat_list)[as.data.frame(dg_spec_local_dat_list)$group != "Coastal Tanna",] |> as.list()
+dg_spec_local_dat_list$group <- as.factor(dg_spec_local_dat_list$group)
+
+dg_spec_local_dat_list$N <- length(dg_spec_local_dat_list$y)
+dg_spec_local_dat_list$K <- as.integer(max(dg_spec_local_dat_list$y))
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+m_dg_spec_local_int_prep <- dg_int_prep_fun(dg_spec_local_dat_list)
+
+# amend Stan code
+m_dg_spec_local_int_stan <- dg_stancode_fun(m_dg_spec_local_int_prep)
+
+## fit model in CmdStan
+m_dg_spec_local_int_cmdstan_fit <- cmdstanfit_fun(m_dg_spec_local_int_stan, m_dg_spec_local_int_prep)
+
+```
+
+```{r dg-spec-local-int-check, include = TRUE}
+
+int_check_fun(m_dg_spec_local_int_prep, m_dg_spec_local_int_cmdstan_fit)
+
+```
+
+```{r dg-spec-local-int-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_spec_local_int_prep, m_dg_spec_local_int_cmdstan_fit)
+
+```
+
+```{r dg-spec-local-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_dg_spec_local_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## DG SPEC LOCAL ADD
+
+```{r dg-spec-local-add}
+### Prepare additive model and model data with rethinking
+m_dg_spec_local_add_prep <- dg_add_prep_fun(dg_spec_local_dat_list)
+
+# amend Stan code
+m_dg_spec_local_add_stan <- dg_stancode_fun(m_dg_spec_local_add_prep)
+
+## fit model in CmdStan
+m_dg_spec_local_add_cmdstan_fit <- cmdstanfit_fun(m_dg_spec_local_add_stan, m_dg_spec_local_add_prep)
+
+```
+
+```{r dg-spec-local-add-check, include = TRUE}
+
+add_check_fun(m_dg_spec_local_add_prep, m_dg_spec_local_add_cmdstan_fit)
+
+```
+
+```{r dg-spec-local-add-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_spec_local_add_prep, m_dg_spec_local_add_cmdstan_fit)
+
+```
+
+```{r dg-spec-local-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_dg_spec_local_add_cmdstan_fit)
+
+```
+
+```{r dg-spec-local-loo, include = TRUE}
+
+loo_compare(m_dg_spec_local_int_cmdstan_fit$loo(),m_dg_spec_local_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## RAG MV SELF INT
+
+```{r rag-mv-self-int}
+### Select RAG SELF variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==1 & full_df$SELF==1 ) # Only RAG SELF and non-missing outcome
+
+rag_mv_self_dat_list <- with(full_df,
+                 list(
+                 id = NEW.ID[y_notmiss],
+                 group = GROUP[y_notmiss],
+                 M = BGD.MORVIRTPROP[y_notmiss],
+                 C = CHILDREN[y_notmiss],
+                 S = MAT[y_notmiss],
+                 P = DIEPUN[y_notmiss],
+                 O = OMNI.BG[y_notmiss],
+                 y = Y[y_notmiss],
+                 order = RAG.ORDER[y_notmiss],
+                 check = RAG.CHECK[y_notmiss],
+                 type = SELF[y_notmiss]
+                 )
+               )
+
+rag_mv_self_dat_list$N <- length(rag_mv_self_dat_list$y)
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+m_rag_mv_self_int_prep <- rag_int_prep_fun(rag_mv_self_dat_list)
+
+# amend Stan code
+m_rag_mv_self_int_stan <- rag_stancode_fun(m_rag_mv_self_int_prep)
+
+## fit model in CmdStan
+m_rag_mv_self_int_cmdstan_fit <- cmdstanfit_fun(m_rag_mv_self_int_stan, m_rag_mv_self_int_prep)
+
+```
+
+```{r rag-mv-self-int-check, include = TRUE}
+
+int_check_fun(m_rag_mv_self_int_prep, m_rag_mv_self_int_cmdstan_fit)
+
+```
+
+```{r rag-mv-self-int-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_mv_self_int_prep, m_rag_mv_self_int_cmdstan_fit)
+
+```
+
+```{r rag-mv-self-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_rag_mv_self_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## RAG MV SELF ADD
+
+```{r rag-mv-self-add}
+### Prepare additive model and model data with rethinking
+m_rag_mv_self_add_prep <- rag_add_prep_fun(rag_mv_self_dat_list)
+
+# amend Stan code
+m_rag_mv_self_add_stan <- rag_stancode_fun(m_rag_mv_self_add_prep)
+
+## fit model in CmdStan
+m_rag_mv_self_add_cmdstan_fit <- cmdstanfit_fun(m_rag_mv_self_add_stan, m_rag_mv_self_add_prep)
+
+
+```
+
+```{r rag-mv-self-add-check, include = TRUE}
+
+add_check_fun(m_rag_mv_self_add_prep, m_rag_mv_self_add_cmdstan_fit)
+
+```
+
+```{r rag-mv-self-add-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_mv_self_add_prep, m_rag_mv_self_add_cmdstan_fit)
+
+```
+
+```{r rag-mv-self-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_rag_mv_self_add_cmdstan_fit)
+
+```
+
+```{r rag-mv-self-loo, include = TRUE}
+
+loo_compare(m_rag_mv_self_int_cmdstan_fit$loo(),m_rag_mv_self_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## RAG MV LOCAL INT
+
+```{r rag-mv-local-int}
+### Select RAG LOCAL variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==1 & full_df$SELF==0 ) # Only RAG LOCAL and non-missing outcome
+
+rag_mv_local_dat_list <- with(full_df,
+                 list(
+                 id = NEW.ID[y_notmiss],
+                 group = GROUP[y_notmiss],
+                 M = BGD.MORVIRTPROP[y_notmiss],
+                 C = CHILDREN[y_notmiss],
+                 S = MAT[y_notmiss],
+                 P = DIEPUN[y_notmiss],
+                 O = OMNI.BG[y_notmiss],
+                 y = Y[y_notmiss],
+                 order = RAG.ORDER[y_notmiss],
+                 check = RAG.CHECK[y_notmiss],
+                 type = SELF[y_notmiss]
+                 )
+               )
+
+rag_mv_local_dat_list$N <- length(rag_mv_local_dat_list$y)
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+m_rag_mv_local_int_prep <- rag_int_prep_fun(rag_mv_local_dat_list)
+
+# amend Stan code
+m_rag_mv_local_int_stan <- rag_stancode_fun(m_rag_mv_local_int_prep)
+
+## fit model in CmdStan
+m_rag_mv_local_int_cmdstan_fit <- cmdstanfit_fun(m_rag_mv_local_int_stan, m_rag_mv_local_int_prep)
+
+```
+
+```{r rag-mv-local-int-check, include = TRUE}
+
+int_check_fun(m_rag_mv_local_int_prep, m_rag_mv_local_int_cmdstan_fit)
+
+```
+
+```{r rag-mv-local-int-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_mv_local_int_prep, m_rag_mv_local_int_cmdstan_fit)
+
+```
+
+```{r rag-mv-local-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_rag_mv_local_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## RAG MV LOCAL ADD
+
+```{r rag-mv-local-add}
+### Prepare additive model and model data with rethinking
+m_rag_mv_local_add_prep <- rag_add_prep_fun(rag_mv_local_dat_list)
+
+# amend Stan code
+m_rag_mv_local_add_stan <- rag_stancode_fun(m_rag_mv_local_add_prep)
+
+## fit model in CmdStan
+m_rag_mv_local_add_cmdstan_fit <- cmdstanfit_fun(m_rag_mv_local_add_stan, m_rag_mv_local_add_prep)
+
+```
+
+```{r rag-mv-local-add-check, include = TRUE}
+
+add_check_fun(m_rag_mv_local_add_prep, m_rag_mv_local_add_cmdstan_fit)
+
+```
+
+```{r rag-mv-local-add-ppc, include = TRUE}
+
+ppc_site_fun(m_rag_mv_local_add_prep, m_rag_mv_local_add_cmdstan_fit)
+
+```
+
+```{r rag-mv-local-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_rag_mv_local_add_cmdstan_fit)
+
+```
+
+```{r rag-mv-local-loo, include = TRUE}
+
+loo_compare(m_rag_mv_local_int_cmdstan_fit$loo(),m_rag_mv_local_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## DG MV SELF INT
+
+```{r dg-mv-self-int}
+### Select DG SELF variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==0 & full_df$SELF==1 ) # Only DG SELF and non-missing outcome
+
+dg_mv_self_dat_list <- with(full_df,
+                 list(
+                   id = NEW.ID[y_notmiss],
+                   group = GROUP[y_notmiss],
+                   M = BGD.MORVIRTPROP[y_notmiss],
+                   S = MAT[y_notmiss],
+                   order = DG.ORDER[y_notmiss],
+                   check = DG.CHECK[y_notmiss],
+                   type = SELF[y_notmiss],
+                   C = CHILDREN[y_notmiss],
+                   P = DIEPUN[y_notmiss],
+                   O = OMNI.BG[y_notmiss],
+                   y = Y[y_notmiss]+1)
+                 )
+
+# remove Coastal Tanna, which have no free-list data for the DG game participants
+dg_mv_self_dat_list <- as.data.frame(dg_mv_self_dat_list)[as.data.frame(dg_mv_self_dat_list)$group != "Coastal Tanna",] |> as.list()
+dg_mv_self_dat_list$group <- as.factor(dg_mv_self_dat_list$group)
+
+dg_mv_self_dat_list$N <- length(dg_mv_self_dat_list$y)
+dg_mv_self_dat_list$K <- as.integer(max(dg_mv_self_dat_list$y))
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+m_dg_mv_self_int_prep <- dg_int_prep_fun(dg_mv_self_dat_list)
+
+# amend Stan code
+m_dg_mv_self_int_stan <- dg_stancode_fun(m_dg_mv_self_int_prep)
+
+## fit model in CmdStan
+m_dg_mv_self_int_cmdstan_fit <- cmdstanfit_fun(m_dg_mv_self_int_stan, m_dg_mv_self_int_prep)
+
+```
+
+```{r dg-mv-self-int-check, include = TRUE}
+
+int_check_fun(m_dg_mv_self_int_prep, m_dg_mv_self_int_cmdstan_fit)
+
+```
+
+```{r dg-mv-self-int-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_mv_self_int_prep, m_dg_mv_self_int_cmdstan_fit)
+
+```
+
+```{r dg-mv-self-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_dg_mv_self_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## DG MV SELF ADD
+
+```{r dg-mv-self-add}
+### Prepare additive model and model data with rethinking
+m_dg_mv_self_add_prep <- dg_add_prep_fun(dg_mv_self_dat_list)
+
+# amend Stan code
+m_dg_mv_self_add_stan <- dg_stancode_fun(m_dg_mv_self_add_prep)
+
+## fit model in CmdStan
+m_dg_mv_self_add_cmdstan_fit <- cmdstanfit_fun(m_dg_mv_self_add_stan, m_dg_mv_self_add_prep)
+
+```
+
+```{r dg-mv-self-add-check, include = TRUE}
+
+add_check_fun(m_dg_mv_self_add_prep, m_dg_mv_self_add_cmdstan_fit)
+
+```
+
+```{r dg-mv-self-add-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_mv_self_add_prep, m_dg_mv_self_add_cmdstan_fit)
+
+```
+
+```{r dg-mv-self-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_dg_mv_self_add_cmdstan_fit)
+
+```
+
+```{r dg-mv-self-loo, include = TRUE}
+
+loo_compare(m_dg_mv_self_int_cmdstan_fit$loo(),m_dg_mv_self_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+## DG MV LOCAL INT
+
+```{r dg-mv-local-int}
+### Select DG LOCAL variables
+y_notmiss <- which( !is.na(full_df$Y) & full_df$RAG==0 & full_df$SELF==0 ) # Only DG LOCAL and non-missing outcome
+
+dg_mv_local_dat_list <- with(full_df,
+                 list(
+                 id = NEW.ID[y_notmiss],
+                 group = GROUP[y_notmiss],
+                 M = BGD.MORVIRTPROP[y_notmiss],
+                 C = CHILDREN[y_notmiss],
+                 S = MAT[y_notmiss],
+                 P = DIEPUN[y_notmiss],
+                 O = OMNI.BG[y_notmiss],
+                 y = Y[y_notmiss]+1,
+                 order = DG.ORDER[y_notmiss],
+                 check = DG.CHECK[y_notmiss],
+                 type = SELF[y_notmiss]
+                 )
+               )
+
+# remove Coastal Tanna, which have no free-list data for the DG game participants
+dg_mv_local_dat_list <- as.data.frame(dg_mv_local_dat_list)[as.data.frame(dg_mv_local_dat_list)$group != "Coastal Tanna",] |> as.list()
+dg_mv_local_dat_list$group <- as.factor(dg_mv_local_dat_list$group)
+
+dg_mv_local_dat_list$N <- length(dg_mv_local_dat_list$y)
+dg_mv_local_dat_list$K <- as.integer(max(dg_mv_local_dat_list$y))
+
+### Interaction Model
+
+### Prepare interaction model and model data with rethinking
+m_dg_mv_local_int_prep <- dg_int_prep_fun(dg_mv_local_dat_list)
+
+# amend Stan code
+m_dg_mv_local_int_stan <- dg_stancode_fun(m_dg_mv_local_int_prep)
+
+## fit model in CmdStan
+m_dg_mv_local_int_cmdstan_fit <- cmdstanfit_fun(m_dg_mv_local_int_stan, m_dg_mv_local_int_prep)
+
+```
+
+```{r dg-mv-local-int-check, include = TRUE}
+
+int_check_fun(m_dg_mv_local_int_prep, m_dg_mv_local_int_cmdstan_fit)
+
+```
+
+```{r dg-mv-local-int-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_mv_local_int_prep, m_dg_mv_local_int_cmdstan_fit)
+
+```
+
+```{r dg-mv-local-int-trank, include = TRUE, warning = FALSE}
+
+int_trank_fun(m_dg_mv_local_int_cmdstan_fit)
+
+```
+
+\newpage
+
+## DG MV LOCAL ADD
+
+```{r dg-mv-local-add}
+### Prepare additive model and model data with rethinking
+m_dg_mv_local_add_prep <- dg_add_prep_fun(dg_mv_local_dat_list)
+
+# amend Stan code
+m_dg_mv_local_add_stan <- dg_stancode_fun(m_dg_mv_local_add_prep)
+
+## fit model in CmdStan
+m_dg_mv_local_add_cmdstan_fit <- cmdstanfit_fun(m_dg_mv_local_add_stan, m_dg_mv_local_add_prep)
+
+```
+
+```{r dg-mv-local-add-check, include = TRUE}
+
+add_check_fun(m_dg_mv_local_add_prep, m_dg_mv_local_add_cmdstan_fit)
+
+```
+
+```{r dg-mv-local-add-ppc, include = TRUE}
+
+ppc_site_fun(m_dg_mv_local_add_prep, m_dg_mv_local_add_cmdstan_fit)
+
+```
+
+```{r dg-mv-local-add-trank, include = TRUE, warning = FALSE}
+
+add_trank_fun(m_dg_mv_local_add_cmdstan_fit)
+
+```
+
+```{r dg-mv-local-loo, include = TRUE}
+
+loo_compare(m_dg_mv_local_int_cmdstan_fit$loo(),m_dg_mv_local_add_cmdstan_fit$loo())
+
+```
+
+\newpage
+
+```{r save-envir, include=FALSE, cache=FALSE}
+save.image("model_fits.RData")
+```
+
+## References
+
+```{r cite-package, results = 'asis', cache = FALSE, include = TRUE}
+cite_packages(dependencies = TRUE, cite.tidyverse = TRUE, output = "paragraph")
+```

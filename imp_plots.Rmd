@@ -1,0 +1,367 @@
+---
+title: "**Imputation Plots**"
+author: "Theiss Bendixen"
+date: "`r Sys.Date()`"
+output: pdf_document
+bibliography: grateful-refs.bib
+---
+
+```{r lockfile, include=FALSE}
+# to initialize and embed the package environment generates the call renv::use(...) below, run:
+# renv::embed()
+
+renv::use(
+  "BH@1.78.0-0",
+  "MASS@7.3-54",
+  "Matrix@1.5-3",
+  "Pakillo/grateful@HEAD",
+  "R6@2.5.1",
+  "RColorBrewer@1.1-2",
+  "RCurl@1.98-1.6",
+  "Rcpp@1.0.8",
+  "RcppEigen@0.3.3.9.1",
+  "RcppParallel@5.1.5",
+  "StanHeaders@2.21.0-7",
+  "abind@1.4-5",
+  "backports@1.4.1",
+  "base64enc@0.1-3",
+  "bitops@1.0-7",
+  "bslib@0.3.1",
+  "callr@3.7.0",
+  "checkmate@2.0.0",
+  "cli@3.2.0",
+  "stan-dev/cmdstanr@HEAD",
+  "coda@0.19-4",
+  "colorspace@2.0-3",
+  "crayon@1.5.0",
+  "data.table@1.14.2",
+  "desc@1.4.0",
+  "digest@0.6.29",
+  "distributional@0.3.0",
+  "ellipsis@0.3.2",
+  "evaluate@0.15",
+  "fansi@1.0.2",
+  "farver@2.1.0",
+  "fastmap@1.1.0",
+  "fs@1.5.2",
+  "generics@0.1.2",
+  "ggplot2@3.3.5",
+  "ggtext@0.1.1",
+  "glue@1.6.1",
+  "gridExtra@2.3",
+  "gridtext@0.1.4",
+  "gtable@0.3.0",
+  "highr@0.9",
+  "htmltools@0.5.2",
+  "inline@0.3.19",
+  "isoband@0.2.5",
+  "jpeg@0.1-9",
+  "jquerylib@0.1.4",
+  "jsonlite@1.8.0",
+  "knitr@1.39",
+  "labeling@0.4.2",
+  "lattice@0.20-45",
+  "lifecycle@1.0.1",
+  "loo@2.4.1",
+  "magrittr@2.0.2",
+  "markdown@1.1",
+  "matrixStats@0.61.0",
+  "mgcv@1.8-38",
+  "mime@0.12",
+  "munsell@0.5.0",
+  "mvtnorm@1.1-3",
+  "nlme@3.1-153",
+  "numDeriv@2016.8-1.1",
+  "patchwork@1.1.1",
+  "pillar@1.7.0",
+  "pkgbuild@1.3.1",
+  "pkgconfig@2.0.3",
+  "png@0.1-7",
+  "posterior@1.2.0",
+  "prettyunits@1.1.1",
+  "processx@3.5.2",
+  "ps@1.6.0",
+  "quadprog@1.5-8",
+  "rappdirs@0.3.3",
+  "remotes@2.4.2",
+  "renv@0.16.0",
+  "rlang@1.0.6",
+  "rmarkdown@2.14",
+  "rmcelreath/rethinking@HEAD",
+  "rprojroot@2.0.2",
+  "rstan@2.21.3",
+  "sass@0.4.1",
+  "scales@1.1.1",
+  "shape@1.4.6",
+  "stringi@1.7.6",
+  "stringr@1.4.0",
+  "tensorA@0.36.2",
+  "tibble@3.1.6",
+  "tinytex@0.38",
+  "utf8@1.2.2",
+  "vctrs@0.3.8",
+  "viridisLite@0.4.0",
+  "withr@2.5.0",
+  "xfun@0.29",
+  "xml2@1.3.3",
+  "yaml@2.3.5"
+)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache = TRUE, include = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r load, cache = FALSE}
+library(ggtext)
+library(rethinking)
+library(grateful)
+library(patchwork)
+
+load("model_fits.Rdata")
+
+memory.limit(size=56000)
+
+```
+
+```{r imp_plot_fun}
+### Observed data in black, means of imputed values in blue with 89% intervals
+
+na_plot_fun <- function(fit, datlist, variable, binpred = c(TRUE, FALSE), ncol) {
+  
+  df <- as.data.frame(datlist)
+
+  # extract variable and variable name
+  var_impute <- fit$draws(deparse(substitute(variable))) |> posterior::as_draws_matrix()
+  var <- gsub("_.*", "", colnames(var_impute[,2]))
+
+  # get ids for missing values
+  var_miss_idx <- which(is.na(df[var]))
+  
+  if(binpred == TRUE) {
+  # compute means and HPDIs of imputed values for binary predictors
+  var_impute_mu <- apply(var_impute[,var_miss_idx], 2, mean)
+  var_impute_ci <- apply(var_impute[,var_miss_idx], 2, HPDI)
+  }
+  
+  if(binpred == FALSE) {
+  # compute means and HPDIs of imputed values for non-binary predictors
+  var_impute_mu <- apply(var_impute, 2, mean)
+  var_impute_ci <- apply(var_impute, 2, HPDI)
+  }
+  
+  # get outcome and group values where predictor values are missing
+  Ymi <- df$y[var_miss_idx]
+  groupmi <- df$group[var_miss_idx]
+
+  # collect in df
+  Xmiss <- data.frame(Ymi=Ymi, group = groupmi, var_impute_mu=var_impute_mu, var_impute_ci_min = var_impute_ci[1,], var_impute_ci_max = var_impute_ci[2,])
+
+  # extract predictor in format for plotting
+  df$X <- df[,var]
+
+  # # get model name in format for plotting
+  modelname <- deparse(substitute(fit))
+  modelname <- gsub("m_", "", modelname)
+  modelname <- gsub("_cmdstan_fit", "", modelname)
+  modelname <- gsub("_", " ", modelname) |> toupper() |> paste("Model.\nImputed values are posterior means and 89% HPDIs.")
+
+  # # plot!
+  ggplot() +
+    geom_point(data = df, aes(x=X,y=y), alpha=0.1) +
+    facet_wrap(~group, ncol=ncol) +
+      geom_pointrange(data=Xmiss, aes(x=var_impute_mu,y=Ymi,xmin=var_impute_ci_min,xmax=var_impute_ci_max),
+                      color = "#3182BD", alpha=0.5) +
+    theme(panel.grid.minor = element_blank(),
+          panel.background = element_rect(fill = "white"),
+          panel.grid.major.y = element_blank(),
+          axis.text.x = element_text(size = 8)) +
+    ylab("Coins to DISTANT") +
+    xlab(var) +
+    scale_x_continuous(n.breaks = 4) +
+    theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
+    labs(title = "Missing Data Imputation",
+         subtitle = "Visualizing <b style='color:#666666;'>observed</b> vs. <b style='color:#0072B2;'>imputed</b> values",
+         caption = modelname)
+}
+
+## The function takes as input:
+
+# fit = the fitted cmdstan model, 
+# e.g. m_rag_self_int_cmdstan_fit (m_[RAG or DG]_[{blank}/index/spec/mv_][SELF or LOCAL]_cmdstan_fit);
+
+# datlist = the data list used in fitting;
+# e.g. rag_self_dat_list ([RAG or DG]_[{blank}/index/spec/mv_][SELF or LOCAL]dat_list);
+
+# variable = the name of the imputation parameter for variable
+
+# binpred = whether the variable to be imputed is binary (TRUE) or not (FALSE);
+
+# ncol = number of facet columns
+
+# Note that when the imputed predictor is binary, we plot the phi parameter, 
+# which is the probability of a 1 in the Bernoulli distribution, and not actual imputed binary values.
+
+```
+
+## Introduction
+
+This notebook reports plots from missing data imputations of all variables and across all main models. The imputations of the supplementary models can also be inspected, see the `.Rmd` file for details. 
+
+In the plots, the black points are observed values, while the blue points and intervals are posterior means and HPDIs of the imputed values. The **caption gives the model** -- e.g., `RAG SELF INT` refers to the RAG SELF interaction model and `RAG SELF ADD` refers to the RAG SELF additive model -- and the ***x*-axis gives the variable key**. 
+
+Note that for the binary variables food security (`S`) and game check (`check`), the imputed values are the probabilities of a 1 (denoted, respectively, by $\phi_{\textrm{food}}$ and $\phi_{\textrm{check}}$ in our formal model notation).
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_rag_self_int_cmdstan_fit, rag_self_dat_list, M_impute, binpred = FALSE, 5)) +
+(na_plot_fun(m_rag_local_int_cmdstan_fit, rag_local_dat_list, M_impute, binpred = FALSE, 5)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_rag_self_add_cmdstan_fit, rag_self_dat_list, M_impute, binpred = FALSE, 5)) +
+(na_plot_fun(m_rag_local_add_cmdstan_fit, rag_local_dat_list, M_impute, binpred = FALSE, 5)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_dg_self_int_cmdstan_fit, dg_self_dat_list, M_impute, binpred = FALSE, 3)) +
+(na_plot_fun(m_dg_local_int_cmdstan_fit, dg_local_dat_list, M_impute, binpred = FALSE, 3)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_dg_self_add_cmdstan_fit, dg_self_dat_list, M_impute, binpred = FALSE, 3)) +
+(na_plot_fun(m_dg_local_add_cmdstan_fit, dg_local_dat_list, M_impute, binpred = FALSE, 3)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_rag_self_int_cmdstan_fit, rag_self_dat_list, P_impute, binpred = FALSE, 5)) +
+(na_plot_fun(m_rag_local_int_cmdstan_fit, rag_local_dat_list, P_impute, binpred = FALSE, 5)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_rag_self_add_cmdstan_fit, rag_self_dat_list, P_impute, binpred = FALSE, 5)) +
+(na_plot_fun(m_rag_local_add_cmdstan_fit, rag_local_dat_list, P_impute, binpred = FALSE, 5)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_dg_self_int_cmdstan_fit, dg_self_dat_list, P_impute, binpred = FALSE, 3)) +
+(na_plot_fun(m_dg_local_int_cmdstan_fit, dg_local_dat_list, P_impute, binpred = FALSE, 3)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_dg_self_add_cmdstan_fit, dg_self_dat_list, P_impute, binpred = FALSE, 3)) +
+(na_plot_fun(m_dg_local_add_cmdstan_fit, dg_local_dat_list, P_impute, binpred = FALSE, 3)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_rag_self_int_cmdstan_fit, rag_self_dat_list, O_impute, binpred = FALSE, 5)) +
+(na_plot_fun(m_rag_local_int_cmdstan_fit, rag_local_dat_list, O_impute, binpred = FALSE, 5)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_rag_self_add_cmdstan_fit, rag_self_dat_list, O_impute, binpred = FALSE, 5)) +
+(na_plot_fun(m_rag_local_add_cmdstan_fit, rag_local_dat_list, O_impute, binpred = FALSE, 5)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_dg_self_int_cmdstan_fit, dg_self_dat_list, O_impute, binpred = FALSE, 3)) +
+(na_plot_fun(m_dg_local_int_cmdstan_fit, dg_local_dat_list, O_impute, binpred = FALSE, 3)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_dg_self_add_cmdstan_fit, dg_self_dat_list, O_impute, binpred = FALSE, 3)) +
+(na_plot_fun(m_dg_local_add_cmdstan_fit, dg_local_dat_list, O_impute, binpred = FALSE, 3)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_rag_self_int_cmdstan_fit, rag_self_dat_list, S_impute, binpred = TRUE, 5)) +
+(na_plot_fun(m_rag_local_int_cmdstan_fit, rag_local_dat_list, S_impute, binpred = TRUE, 5)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_rag_self_add_cmdstan_fit, rag_self_dat_list, S_impute, binpred = TRUE, 5)) +
+(na_plot_fun(m_rag_local_add_cmdstan_fit, rag_local_dat_list, S_impute, binpred = TRUE, 5)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_dg_self_int_cmdstan_fit, dg_self_dat_list, S_impute, binpred = TRUE, 3)) +
+(na_plot_fun(m_dg_local_int_cmdstan_fit, dg_local_dat_list, S_impute, binpred = TRUE, 3)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_dg_self_add_cmdstan_fit, dg_self_dat_list, S_impute, binpred = TRUE, 3)) +
+(na_plot_fun(m_dg_local_add_cmdstan_fit, dg_local_dat_list, S_impute, binpred = TRUE, 3)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_rag_self_int_cmdstan_fit, rag_self_dat_list, check_impute, binpred = TRUE, 5)) +
+(na_plot_fun(m_rag_local_int_cmdstan_fit, rag_local_dat_list, check_impute, binpred = TRUE, 5)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_rag_self_add_cmdstan_fit, rag_self_dat_list, check_impute, binpred = TRUE, 5)) +
+(na_plot_fun(m_rag_local_add_cmdstan_fit, rag_local_dat_list, check_impute, binpred = TRUE, 5)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_dg_self_int_cmdstan_fit, dg_self_dat_list, check_impute, binpred = TRUE, 3)) +
+(na_plot_fun(m_dg_local_int_cmdstan_fit, dg_local_dat_list, check_impute, binpred = TRUE, 3)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+```{r echo = FALSE, include = TRUE, fig.height = 10, fig.width = 8}
+(na_plot_fun(m_dg_self_add_cmdstan_fit, dg_self_dat_list, check_impute, binpred = TRUE, 3)) +
+(na_plot_fun(m_dg_local_add_cmdstan_fit, dg_local_dat_list, check_impute, binpred = TRUE, 3)) +
+  patchwork::plot_layout(ncol = 1, nrow = 2)
+
+```
+
+\newpage
+
+# `R` packages
+
+```{r cite-package, results = 'asis', cache = FALSE, include = TRUE}
+cite_packages(dependencies = TRUE, cite.tidyverse = TRUE, output = "paragraph")
+```
+
+\newpage
+
+# References
+
+<div id="refs"></div>
