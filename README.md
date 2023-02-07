@@ -30,6 +30,8 @@ The **pre-registration** folder contains the following files:
 
 `pre-reg_dg-prob.R` and `pre-reg_rag-prob.R`: Compute and plot posterior predicted probabilities from the fitted Dictator Game and Random Allocation Game models, respectively.
 
+---
+
 The `.Rmd` files lists all `R` packages, their dependencies, and version number used.
 
 The `.Rmd` files require the following software and their dependencies:
