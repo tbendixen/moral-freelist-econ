@@ -378,12 +378,12 @@ cairo_pdf("rag_fig.pdf",
     theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
     labs(title = "Random Allocation <b style='color:#000000;'>SELF</b> Game",
          subtitle = "Contrasts in predicted probabilities of allocating a coin to the DISTANT cup<br>
-         between <b style='color:#666666;'>not free-listing Morality</b> vs. <b style='color:#0072B2;'>free-listing only Morality</b> among god's concerns",)) +
+         between <b style='color:#666666;'>not free-listing Morality</b> vs. <b style='color:#0072B2;'>free-listing only Morality</b> among god's concerns")) +
 (rag_plot_fun(m_rag_local_int_cmdstan_fit, rag_local_dat_list, interaction = TRUE) +
     theme(plot.title = element_markdown(), plot.subtitle = element_markdown()) +
     labs(title = "Random Allocation <b style='color:#000000;'>LOCAL</b> Game",
          subtitle = "Contrasts in predicted probabilities of allocating a coin to the DISTANT cup<br>
-         between <b style='color:#666666;'>not free-listing Morality</b> vs. <b style='color:#0072B2;'>free-listing only Morality</b> among god's concerns",)) +
+         between <b style='color:#666666;'>not free-listing Morality</b> vs. <b style='color:#0072B2;'>free-listing only Morality</b> among god's concerns")) +
   patchwork ::plot_layout(ncol = 1, nrow = 2)
 
 dev.off() # end print to pdf
