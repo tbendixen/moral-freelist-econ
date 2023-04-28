@@ -22,6 +22,8 @@
 
 `pre-registration.pdf`: Pre-registration document.
 
+`rawDataDensPlots.R`: Script for reproducing density plots of raw data distributions in the main manuscript.
+
 ---
 
 The **pre-registration** folder contains the following files:
